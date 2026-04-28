@@ -1,0 +1,98 @@
+const mongoose = require('mongoose');
+
+const deviceDataSchema = new mongoose.Schema({
+    deviceId: {
+        type: String,
+        required: true,
+    },
+    deviceName: {
+        type: String,
+    },
+    batteryTemperature: {
+        type: Number,
+    },
+    motorTemperature: {
+        type: Number,
+    },
+    batterySOC: {
+        type: Number,
+    },
+    batterySOH: {
+        type: Number,   // State of Health (%)
+        default: null,
+    },
+    batteryVoltage: {
+        type: Number,
+    },
+    gpsLatitude: {
+        type: Number,
+    },
+    gpsLongitude: {
+        type: Number,
+    },
+    speed: {
+        type: Number,
+        default: 0,
+    },
+    motorRPM: {
+        type: Number,
+        default: 0,
+    },
+    wheelRPM: {
+        type: Number,
+        default: 0,
+    },
+    loss: {
+        type: Number,
+        default: 0,
+    },
+    torque: {
+        type: Number,
+        default: 0,
+    },
+    flRadar: {
+        type: Number,
+    },
+    frRadar: {
+        type: Number,
+    },
+    rlRadar: {
+        type: Number,
+    },
+    rrRadar: {
+        type: Number,
+    },
+    brakeStatus: {
+        type: String,
+        enum: ['APPLIED', 'RELEASED'],
+        default: 'RELEASED',
+    },
+    // Emergency brake event — recorded timestamp when brakeStatus flips to APPLIED
+    emergencyBrakeTimestamp: {
+        type: Date,
+        default: null,
+    },
+    // Accident detection flag (set by sensor/algorithm)
+    accidentDetected: {
+        type: Boolean,
+        default: false,
+    },
+    lux: {
+        type: Number,
+    },
+    headlightStatus: {
+        type: String,
+        enum: ['ON', 'OFF'],
+        default: 'OFF',
+    },
+    action: {
+        type: String, // e.g., 'TELEMETRY_SYNC', 'EMERGENCY_TRIGGER'
+        default: 'TELEMETRY_SYNC',
+    },
+    timestamp: {
+        type: Date,
+        default: Date.now,
+    }
+});
+
+module.exports = mongoose.model('DeviceData', deviceDataSchema);
