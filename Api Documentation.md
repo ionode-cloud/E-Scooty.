@@ -4,6 +4,22 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 
 ---
 
+## 🚀 Postman Integration Guide
+
+If you are using Postman to test these APIs, follow these steps to avoid common errors:
+
+1.  **Port**: Use `http://localhost:5115` for all requests.
+2.  **Authorization**: 
+    *   Go to the **Authorization** tab in Postman.
+    *   Select **Type**: `Bearer Token`.
+    *   Paste your admin token (received from the Login API) into the **Token** field.
+3.  **Headers**: Ensure `Content-Type: application/json` is set in the Headers tab.
+4.  **DELETE Methods**: 
+    *   For **Section 4.3** (Dashboard removal), use the URL path: `/api/escooty/node/YOUR_DEVICE_ID`.
+    *   For **Section 1**, use query parameters: `/api/escooty?deviceId=YOUR_DEVICE_ID`.
+
+---
+
 ## 1. Core Telemetry Synchronization — `/api/escooty`
 
 All telemetry CRUD operations are handled at this unified base endpoint.
@@ -12,73 +28,41 @@ All telemetry CRUD operations are handled at this unified base endpoint.
 **Description:** Send real-time telemetry from the E-Scooty node. Creates a **new** record every call.
 
 ### `PUT /api/escooty` — Update/Create Telemetry Record
-**Description:** Same body as POST. **Creates a new record** in the history buffer. This ensures every update generates a new entry in the history logs.
+**Description:** Same body as POST. **Creates a new record** in the history buffer.
 
-### Request Body (JSON) — same for POST and PUT
-The server is flexible and accepts both standard and hardware-specific field names.
-
-| Standard Field | Fallback Field | Type | Description |
-| :--- | :--- | :--- | :--- |
-| `deviceId` | — | `String` | **Required**. Unique identifier (e.g., `"es"`). |
-| `speed` | `Speed` | `Number` | Velocity in km/h. |
-| `batterySOC` | — | `Number` | State of Charge (0-100). |
-| `batterySOH` | — | `Number` | State of Health (0-100). |
-| `batteryVoltage`| — | `Number` | Battery potential in Volts. |
-| `latitude` | `gpsLatitude` | `Number` | GPS Latitude. |
-| `longitude` | `gpsLongitude`| `Number` | GPS Longitude. |
-| `brakeStatus` | — | `String/Num` | `"APPLIED"` (1) or `"RELEASED"` (0). |
-| `action` | — | `String` | Event label (e.g., `"TELEMETRY_SYNC"`). |
-
-### Example Request Body
-```json
-{
-  "deviceId": "es",
-  "batterySOC": 85.5,
-  "batterySOH": 98.2,
-  "batteryVoltage": 48.7,
-  "speed": 25.4,
-  "latitude": 22.5726,
-  "longitude": 88.3639,
-  "brakeStatus": "RELEASED",
-  "action": "TELEMETRY_SYNC"
-}
-```
-
-### Success Response (201 Created)
-```json
-{
-  "success": true,
-  "message": "Core telemetry synchronized",
-  "data": {
-    "deviceId": "es",
-    "speed": 25.4,
-    "batterySOC": 85.5,
-    "batteryVoltage": 48.7,
-    "brakeStatus": "RELEASED",
-    "timestamp": "2024-04-27T10:00:00.000Z"
-  }
-}
-```
+### `DELETE /api/escooty` — Clear Telemetry Data
+**Description:** Deletes ALL telemetry history for a specific device.  
+**Postman Setup:** In the **Params** tab, add `deviceId` = `your_id`.
 
 ---
 
-## 2. Fetch Device History
-**Endpoint:** `GET /api/data/history/:deviceId`  
-**Description:** Retrieves the last 100 telemetry records for the specified device. Used to populate the "Device History Buffer" in the Analytics tab.
+## 4. Dashboard Management — `/api/escooty`
 
----
-
-## 3. Emergency Brake Timestamp Log
-**Endpoint:** `GET /api/data/emergency-logs/:deviceId`  
-**Description:** Retrieves a specialized log of all events where the emergency brake was engaged.
-
----
-
-## 4. Dashboard Management — `/api/escooty/register`
+### 4.1 Register New Dashboard
 **Endpoint:** `POST /api/escooty/register`  
-**Description:** Registers a new dashboard/node configuration.
+**Access:** Admin Only  
+**Body (JSON):**
+```json
+{
+  "dashboardName": "Phoenix Squadron-1",
+  "deviceId": "SCOOTY-001",
+  "location": "Urban Sector A"
+}
+```
+
+### 4.2 Delete Dashboard (by Database ID)
+**Endpoint:** `DELETE /api/escooty/:id`  
+**Access:** Admin Only  
+**Parameter:** `:id` is the internal MongoDB `_id`.
+
+### 4.3 Delete Dashboard (by Device ID)
+**Endpoint:** `DELETE /api/escooty/node/:deviceId`  
+**Access:** Admin Only  
+**Description:** Permanently removes a dashboard configuration.
+
+**Example URL:** `http://localhost:5115/api/escooty/node/es`
 
 ---
 
 > [!IMPORTANT]
-> All local requests should be directed to `http://localhost:5115/api/escooty`. Ensure your `Authorization` header contains a valid Bearer token for protected routes.
+> All local requests should be directed to `http://localhost:5115`. Ensure your `Authorization` header contains a valid Bearer token for protected routes.

@@ -12,24 +12,34 @@ router.route('/')
     .get(dataController.getTelemetry)               // GET    /api/escooty?deviceId=...
     .post(dataController.syncCoreData)              // POST   /api/escooty  (create new record)
     .put(dataController.syncCoreData)               // PUT    /api/escooty  (create new record - aligned with user request)
-    .delete(dataController.deleteTelemetry);        // DELETE /api/escooty?deviceId=...
+    .delete(dataController.deleteTelemetry);        // DELETE /api/escooty?deviceId=... (purge device logs)
+
+// Path-based telemetry purge (easier for Postman)
+router.delete('/history/:deviceId', dataController.deleteTelemetry);
+
+// Delete specific telemetry record by internal ID
+router.delete('/record/:id', dataController.deleteTelemetryRecord);
 
 router.route('/register')
-    .post(protect, admin, escootyController.createDashboard); // POST /api/escooty/register (admin)
+    .post(escootyController.createDashboard); // POST /api/escooty/register
+
+// Delete dashboard by deviceId (hardware signature)
+router.route('/node/:deviceId')
+    .delete(escootyController.deleteDashboardByDeviceId);
 
 router.route('/:id')
-    .put(protect, admin, escootyController.updateDashboard)   // PUT  /api/escooty/:id
-    .delete(protect, admin, escootyController.deleteDashboard); // DELETE /api/escooty/:id
+    .put(escootyController.updateDashboard)   // PUT  /api/escooty/:id
+    .delete(escootyController.deleteDashboard); // DELETE /api/escooty/:id
 
 // ===================================================
 // Device Endpoints — base path: /api/escooty/device
 // ===================================================
 router.route('/device')
     .get(escootyController.getAllDevices)
-    .post(protect, admin, escootyController.createDevice);
+    .post(escootyController.createDevice);
 
 router.route('/device/:id')
-    .put(protect, admin, escootyController.updateDevice)
-    .delete(protect, admin, escootyController.deleteDevice);
+    .put(escootyController.updateDevice)
+    .delete(escootyController.deleteDevice);
 
 module.exports = router;

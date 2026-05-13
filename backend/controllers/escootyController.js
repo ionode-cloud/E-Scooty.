@@ -16,6 +16,12 @@ exports.getAllDashboards = async (req, res) => {
 
 exports.createDashboard = async (req, res) => {
     try {
+        const { deviceId } = req.body;
+        const existing = await Dashboard.findOne({ deviceId });
+        if (existing) {
+            return res.status(400).json({ message: `A dashboard for device ID "${deviceId}" already exists.` });
+        }
+
         const newDashboard = new Dashboard(req.body);
         await newDashboard.save();
         res.status(201).json(newDashboard);
@@ -41,6 +47,30 @@ exports.deleteDashboard = async (req, res) => {
         res.status(200).json({ message: 'Dashboard deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting dashboard', error: error.message });
+    }
+};
+
+exports.deleteDashboardByDeviceId = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        
+        // Delete the dashboard configuration
+        const deletedDashboard = await Dashboard.findOneAndDelete({ deviceId });
+        
+        // Also delete all associated telemetry history
+        const DeviceData = require('../models/DeviceData');
+        const deletedData = await DeviceData.deleteMany({ deviceId });
+
+        if (!deletedDashboard && deletedData.deletedCount === 0) {
+            return res.status(404).json({ message: `No dashboard or telemetry found for device ID "${deviceId}"` });
+        }
+
+        res.status(200).json({ 
+            success: true,
+            message: `Node "${deviceId}" decommissioned. Dashboard removed and ${deletedData.deletedCount} telemetry records purged.` 
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error decommissioning node', error: error.message });
     }
 };
 

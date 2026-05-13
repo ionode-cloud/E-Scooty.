@@ -28,13 +28,15 @@ const AdminPanel = () => {
             const apiUrl = import.meta.env.VITE_API_URL;
             if (editingUser) {
                 if (newUser.password && newUser.password.length < 6) return alert('New password must be at least 6 characters.');
-                const payload = { email: newUser.email, role: newUser.role };
-                if (newUser.password) payload.password = newUser.password;
-                await axios.put(`${apiUrl}/api/users/${editingUser._id}`, payload);
+                await axios.put(`${apiUrl}/api/users/${editingUser._id}`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
             } else {
                 if (!newUser.password) return alert('Password is required for new users.');
                 if (newUser.password.length < 6) return alert('Password must be at least 6 characters.');
-                await axios.post(`${apiUrl}/api/users`, newUser);
+                await axios.post(`${apiUrl}/api/users`, newUser, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
             }
             setNewUser({ email: '', password: '', role: 'user' });
             setEditingUser(null);
@@ -49,7 +51,10 @@ const AdminPanel = () => {
         if (!window.confirm('Delete this user?')) return;
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
-            await axios.delete(`${apiUrl}/api/users/${id}`);
+            const token = localStorage.getItem('token');
+            await axios.delete(`${apiUrl}/api/users/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             fetchUsers();
         } catch (error) { alert(error.response?.data?.message || 'Error deleting user'); }
     };

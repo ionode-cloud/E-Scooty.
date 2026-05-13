@@ -27,7 +27,10 @@ const CreateDashboard = () => {
         const fetchDevices = async () => {
             try {
                 const apiUrl = import.meta.env.VITE_API_URL ;
-                const res = await axios.get(`${apiUrl}/api/devices`);
+                const token = localStorage.getItem('token');
+                const res = await axios.get(`${apiUrl}/api/devices`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 setDevices(res.data);
             } catch (error) {
                 console.error("Error fetching devices", error);
@@ -45,9 +48,11 @@ const CreateDashboard = () => {
 
         try {
             const apiUrl = import.meta.env.VITE_API_URL ;
+            const token = localStorage.getItem('token');
             const res = await axios.post(
                 `${apiUrl}/api/dashboards`,
-                { dashboardName, deviceId, email, password, description }
+                { dashboardName, deviceId, email, password, description },
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
             setCreatedParticleId(res.data.dashboard.particleId);

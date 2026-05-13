@@ -48,7 +48,10 @@ const Dashboard = () => {
         if (!window.confirm('Delete this vehicle dashboard?')) return;
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
-            await axios.delete(`${apiUrl}/api/dashboards/${id}`);
+            const token = localStorage.getItem('token');
+            await axios.delete(`${apiUrl}/api/dashboards/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             const updated = dashboards.filter(d => d._id !== id);
             setDashboards(updated);
             if (selectedDashboard?._id === id) {

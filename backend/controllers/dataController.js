@@ -309,8 +309,8 @@ exports.upsertTelemetry = async (req, res) => {
 // Query param: deviceId (required)
 exports.deleteTelemetry = async (req, res) => {
     try {
-        const { deviceId } = req.query;
-        if (!deviceId) return res.status(400).json({ message: 'deviceId query param is required' });
+        const deviceId = req.params.deviceId || req.query.deviceId;
+        if (!deviceId) return res.status(400).json({ message: 'deviceId is required (as param /history/:deviceId or query ?deviceId=)' });
 
         const result = await DeviceData.deleteMany({ deviceId });
         res.status(200).json({ 
@@ -322,6 +322,15 @@ exports.deleteTelemetry = async (req, res) => {
     }
 };
 
+exports.deleteTelemetryRecord = async (req, res) => {
+    try {
+        const deleted = await DeviceData.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ message: 'Telemetry record not found' });
+        res.status(200).json({ success: true, message: 'Record deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
 
 // Update a specific telemetry record
 exports.updateData = async (req, res) => {

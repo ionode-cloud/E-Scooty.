@@ -27,7 +27,10 @@ const DeviceList = () => {
     const fetchDevices = async () => {
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
-            const res = await axios.get(`${apiUrl}/api/devices`);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${apiUrl}/api/devices`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setDevices(res.data);
         } catch (err) {
             console.error('Error fetching devices', err);
@@ -45,7 +48,10 @@ const DeviceList = () => {
         setFormLoading(true);
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
-            await axios.post(`${apiUrl}/api/devices`, { deviceName, deviceId, location });
+            const token = localStorage.getItem('token');
+            await axios.post(`${apiUrl}/api/devices`, { deviceName, deviceId, location }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setFormSuccess(`Device added successfully!`);
             setDeviceName(''); setDeviceId(''); setLocation('');
             fetchDevices();
@@ -61,7 +67,10 @@ const DeviceList = () => {
         if (!window.confirm('Delete this device?')) return;
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
-            await axios.delete(`${apiUrl}/api/devices/${id}`);
+            const token = localStorage.getItem('token');
+            await axios.delete(`${apiUrl}/api/devices/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setDevices(prev => prev.filter(d => d._id !== id));
         } catch (err) {
             alert('Failed to delete device.');
