@@ -261,6 +261,7 @@ const DataLogs = () => {
                             <tr>
                                 <th className="text-[#064E3B]">Timestamp</th>
                                 <th className="text-[#064E3B]">SOC</th>
+                                <th className="text-[#064E3B]">SOH</th>
                                 <th className="text-[#064E3B]">Voltage</th>
                                 <th className="text-[#064E3B]">Speed</th>
                                 <th className="text-[#064E3B]">Emergency Brake</th>
@@ -284,6 +285,9 @@ const DataLogs = () => {
                                                 </div>
                                                 <span className="text-[#064E3B] font-black text-[11px]">{d.batterySOC}%</span>
                                             </div>
+                                        </td>
+                                        <td>
+                                            <span className="text-xs font-bold text-[#064E3B]">{d.batterySOH ?? 100}%</span>
                                         </td>
                                         <td>
                                             <span className="text-xs font-bold text-[#064E3B]">{d.batteryVoltage}V</span>

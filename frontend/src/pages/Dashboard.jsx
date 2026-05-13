@@ -172,15 +172,19 @@ const Dashboard = () => {
         {
             icon: <Bike size={24} />,
             label: 'Battery SOC',
-            value: `${latestData?.batterySOC ?? '—'}`,
+            value: latestData?.batterySOC !== undefined && latestData?.batterySOC !== null 
+                ? Number(latestData.batterySOC).toFixed(1) 
+                : '0.0',
             unit: '%',
-            grad: 'grad-emerald',
-            sub: 'Live charge status',
+            grad: (latestData?.batterySOC < 20) ? 'grad-emergency' : 'grad-emerald',
+            sub: (latestData?.batterySOC < 20) ? 'Critical Battery' : 'System Optimized',
         },
         {
             icon: <Shield size={24} />,
             label: 'Battery SOH',
-            value: latestData?.batterySOH != null ? `${latestData.batterySOH}` : '—',
+            value: latestData?.batterySOH !== undefined && latestData?.batterySOH !== null 
+                ? Number(latestData.batterySOH).toFixed(1) 
+                : '100.0',
             unit: '%',
             grad: 'grad-emerald',
             sub: 'Health indicator',
@@ -194,20 +198,14 @@ const Dashboard = () => {
             sub: 'Current potential',
         },
         {
-            icon: <Shield size={24} />,
-            label: 'Brake Status',
-            value: latestData?.brakeStatus || 'RELEASED',
-            unit: '',
-            grad: latestData?.brakeStatus === 'APPLIED' ? 'grad-emergency' : 'grad-emerald',
-            sub: latestData?.brakeStatus === 'APPLIED' ? 'Brake Engaged' : 'System Released',
-        },
-        {
             icon: <Activity size={24} />,
-            label: 'Accident Sensor',
-            value: latestData?.accidentDetected ? 'ALERT' : 'STABLE',
-            unit: '',
-            grad: latestData?.accidentDetected ? 'grad-dark' : 'grad-emerald',
-            sub: latestData?.accidentDetected ? 'Crash Detected!' : 'No impacts detected',
+            label: 'Current Speed',
+            value: latestData?.speed !== undefined && latestData?.speed !== null 
+                ? Number(latestData.speed).toFixed(1) 
+                : '0.0',
+            unit: 'km/h',
+            grad: 'grad-emerald',
+            sub: 'Real-time velocity',
         },
     ];
 

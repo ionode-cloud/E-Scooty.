@@ -162,7 +162,7 @@ exports.downloadExcel = async (req, res) => {
 };
 
 // Fields returned by the simplified /api/escooty endpoints
-const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage brakeStatus gpsLatitude gpsLongitude action timestamp';
+const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage speed brakeStatus gpsLatitude gpsLongitude action timestamp';
 
 // Helper: pick only the core fields from a Mongoose document
 const pickCoreFields = (doc) => ({
@@ -171,6 +171,7 @@ const pickCoreFields = (doc) => ({
     batterySOC:         doc.batterySOC,
     batterySOH:         doc.batterySOH,
     batteryVoltage:     doc.batteryVoltage,
+    speed:              doc.speed,
     brakeStatus:        doc.brakeStatus,
     gpsLatitude:        doc.gpsLatitude,
     gpsLongitude:       doc.gpsLongitude,
@@ -183,7 +184,7 @@ exports.syncCoreData = async (req, res) => {
     try {
         const { 
             deviceId, timestamp, batterySOC, batterySOH, batteryVoltage, 
-            brakeStatus, latitude, longitude, action 
+            speed, Speed, brakeStatus, latitude, longitude, gpsLatitude, gpsLongitude, action 
         } = req.body;
 
         if (!deviceId) return res.status(400).json({ message: 'deviceId is required' });
@@ -201,14 +202,15 @@ exports.syncCoreData = async (req, res) => {
         const newData = new DeviceData({
             deviceId,
             timestamp: timestamp ? new Date(timestamp) : new Date(),
-            batterySOC,
-            batterySOH,
-            batteryVoltage,
-            brakeStatus: mappedBrakeStatus,
+            batterySOC:     Number(batterySOC || 0),
+            batterySOH:     Number(batterySOH || 0),
+            batteryVoltage: Number(batteryVoltage || 0),
+            speed:          Number(speed || Speed || 0),
+            brakeStatus:    mappedBrakeStatus,
             emergencyBrakeTimestamp,
-            gpsLatitude: latitude,
-            gpsLongitude: longitude,
-            action: action || 'TELEMETRY_SYNC'
+            gpsLatitude:    Number(latitude || gpsLatitude || 0),
+            gpsLongitude:   Number(longitude || gpsLongitude || 0),
+            action:         action || 'TELEMETRY_SYNC'
         });
 
         await newData.save();
@@ -256,7 +258,7 @@ exports.upsertTelemetry = async (req, res) => {
     try {
         const { 
             deviceId, timestamp, batterySOC, batterySOH, batteryVoltage, 
-            brakeStatus, latitude, longitude, action 
+            speed, Speed, brakeStatus, latitude, longitude, gpsLatitude, gpsLongitude, action 
         } = req.body;
 
         if (!deviceId) return res.status(400).json({ message: 'deviceId is required' });
@@ -273,14 +275,15 @@ exports.upsertTelemetry = async (req, res) => {
         const payload = {
             deviceId,
             timestamp: timestamp ? new Date(timestamp) : new Date(),
-            batterySOC,
-            batterySOH,
-            batteryVoltage,
-            brakeStatus: mappedBrakeStatus,
+            batterySOC:     Number(batterySOC || 0),
+            batterySOH:     Number(batterySOH || 0),
+            batteryVoltage: Number(batteryVoltage || 0),
+            speed:          Number(speed || Speed || 0),
+            brakeStatus:    mappedBrakeStatus,
             emergencyBrakeTimestamp,
-            gpsLatitude: latitude,
-            gpsLongitude: longitude,
-            action: action || 'TELEMETRY_SYNC'
+            gpsLatitude:    Number(latitude || gpsLatitude || 0),
+            gpsLongitude:   Number(longitude || gpsLongitude || 0),
+            action:         action || 'TELEMETRY_SYNC'
         };
 
         // Find the most recent record for this device and update it, or create new

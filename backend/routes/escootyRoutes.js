@@ -11,7 +11,7 @@ const dataController = require('../controllers/dataController');
 router.route('/')
     .get(dataController.getTelemetry)               // GET    /api/escooty?deviceId=...
     .post(dataController.syncCoreData)              // POST   /api/escooty  (create new record)
-    .put(dataController.upsertTelemetry)            // PUT    /api/escooty  (upsert latest record)
+    .put(dataController.syncCoreData)               // PUT    /api/escooty  (create new record - aligned with user request)
     .delete(dataController.deleteTelemetry);        // DELETE /api/escooty?deviceId=...
 
 router.route('/register')
