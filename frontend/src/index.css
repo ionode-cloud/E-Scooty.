@@ -146,7 +146,7 @@
 
 .modern-kpi:hover {
   transform: translateY(-5px);
-  box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
 }
 
 .modern-icon-box {
@@ -158,7 +158,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 2px 6px rgba(255,255,255,0.3);
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.3);
 }
 
 .modern-chart-card {
@@ -191,9 +191,17 @@
 }
 
 /* GRADIENTS - Theme specific */
-.grad-emerald { background: linear-gradient(135deg, #059669 0%, #10B981 100%); }
-.grad-dark { background: linear-gradient(135deg, #064E3B 0%, #065F46 100%); }
-.grad-emergency { background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%); }
+.grad-emerald {
+  background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+}
+
+.grad-dark {
+  background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+}
+
+.grad-emergency {
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+}
 
 .saas-card {
   background: var(--card-bg);
@@ -388,7 +396,8 @@
 /* ============================= */
 .login-page {
   min-height: 100vh;
-  min-height: 100dvh; /* dynamic viewport height for mobile browsers */
+  min-height: 100dvh;
+  /* dynamic viewport height for mobile browsers */
   display: flex;
   background: white;
   flex-direction: row-reverse;
@@ -400,7 +409,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 20px; /* tighter on mobile */
+  padding: 24px 20px;
+  /* tighter on mobile */
   background: white;
   position: relative;
   z-index: 10;
@@ -456,45 +466,63 @@
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
-}/* ============================= */
+}
+
+/* ============================= */
 /* REVERTED FLEET STYLE          */
 /* ============================= */
 .auth-page-container {
-  height: 100vh;
-  background: #F0FDF4; /* Very light green background */
+  min-height: 100vh;
+  background: #F0FDF4;
+  /* Very light green background */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
 }
 
 .auth-glass-card {
   width: 100%;
   max-width: 1100px;
   background: white;
-  border-radius: 60px; /* Very rounded corners as in image */
+  border-radius: 32px;
+  /* Smaller for mobile */
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 40px 100px rgba(6, 78, 59, 0.05);
-  padding: 40px;
-  gap: 40px;
+  box-shadow: 0 20px 60px rgba(6, 78, 59, 0.05);
+  padding: 24px;
+  gap: 24px;
+  margin: auto;
+}
+
+@media (min-width: 640px) {
+  .auth-glass-card {
+    padding: 40px;
+    border-radius: 48px;
+  }
 }
 
 @media (min-width: 1024px) {
   .auth-glass-card {
     flex-direction: row;
-    height: 650px;
-    align-items: center;
+    min-height: 600px;
+    border-radius: 60px;
+    align-items: stretch;
+    padding: 40px;
+    gap: 40px;
   }
 }
 
@@ -503,23 +531,31 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 20px;
+  padding: 10px;
+  width: 100%;
 }
 
 .auth-hero-side {
   flex: 1;
-  height: 100%;
   background: #F8FAFC;
-  border-radius: 40px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 
+@media (min-width: 1024px) {
+  .auth-hero-side {
+    border-radius: 40px;
+    height: 100%;
+  }
+}
+
 .white-login-card {
   width: 100%;
   max-width: 400px;
+  margin: 0 auto;
 }
 
 .auth-input-group {

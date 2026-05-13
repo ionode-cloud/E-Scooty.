@@ -92,13 +92,14 @@ const ResetModal = ({ onClose }) => {
         <div
             onClick={onClose}
             style={{
-                position: 'fixed', inset: 0, zIndex: 50,
+                position: 'fixed', inset: 0, zIndex: 100,
                 background: 'rgba(2,20,15,0.72)', backdropFilter: 'blur(6px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
             }}
         >
             <div
                 onClick={e => e.stopPropagation()}
+                className="modal-container"
                 style={{
                     background: '#fff', borderRadius: '24px', padding: '40px 36px',
                     width: '100%', maxWidth: '420px', boxShadow: '0 30px 80px rgba(0,0,0,0.35)',
@@ -402,10 +403,10 @@ const Login = () => {
                                 </button>
                             </form>
 
-                            <p className="mt-12 text-center text-xs font-bold text-[#64748B]">
+                            <div className="mt-12 text-center text-xs font-bold text-[#64748B]">
                                 New Operator?{' '}
                                 <Link to="/register" className="text-[#10B981] hover:underline font-black">Register Node</Link>
-                            </p>
+                            </div>
                         </div>
                     </div>
 

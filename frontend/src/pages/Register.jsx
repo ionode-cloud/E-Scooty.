@@ -153,10 +153,10 @@ const Register = () => {
                                     </button>
                                 </form>
 
-                                <p className="mt-8 text-center text-xs font-bold text-[#64748B]">
+                                <div className="mt-8 text-center text-xs font-bold text-[#64748B]">
                                     Already an operator?{' '}
                                     <Link to="/login" className="text-[#10B981] hover:underline font-black">Sign in</Link>
-                                </p>
+                                </div>
                             </>
                         )}
 
