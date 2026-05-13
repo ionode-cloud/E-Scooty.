@@ -44,9 +44,9 @@ const DataLogs = () => {
         socket.on('device-data', (data) => {
             if (data.deviceId === selectedDeviceId) {
                 setDeviceData(prev => {
-                    const exists = prev.some(d => d._id === data._id);
+                    const exists = prev.some(d => d._id === data._id || d.timestamp === data.timestamp);
                     if (exists) return prev;
-                    return [data, ...prev].slice(0, 100);
+                    return [data, ...prev].slice(0, 200);
                 });
             }
         });
@@ -260,9 +260,9 @@ const DataLogs = () => {
                         <thead className="bg-[#F8FAFC]">
                             <tr>
                                 <th className="text-[#064E3B]">Timestamp</th>
-                                <th className="text-[#064E3B]">Battery SOC</th>
-                                <th className="text-[#064E3B]">Battery SOH</th>
+                                <th className="text-[#064E3B]">SOC</th>
                                 <th className="text-[#064E3B]">Voltage</th>
+                                <th className="text-[#064E3B]">Speed</th>
                                 <th className="text-[#064E3B]">Emergency Brake</th>
                                 <th className="text-[#064E3B]">GPS Payload</th>
                                 <th className="text-[#064E3B]">Actions</th>
@@ -277,7 +277,7 @@ const DataLogs = () => {
                                 deviceData.map((d, index) => (
                                     <tr key={index} className="hover:bg-emerald-50/30 transition-colors">
                                         <td className="text-[10px] font-bold text-[#64748B] font-mono">{new Date(d.timestamp).toLocaleString()}</td>
-                                        <td>
+                                        <td className="px-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-16 h-2 bg-[#D1FAE5] rounded-full overflow-hidden">
                                                     <div className="h-full bg-[#10B981] rounded-full" style={{ width: `${Math.min(d.batterySOC, 100)}%` }}></div>
@@ -285,12 +285,23 @@ const DataLogs = () => {
                                                 <span className="text-[#064E3B] font-black text-[11px]">{d.batterySOC}%</span>
                                             </div>
                                         </td>
-                                        <td className="font-bold text-[#064E3B]">{d.batterySOH ?? 100}%</td>
-                                        <td className="font-bold text-[#064E3B] text-sm">{d.batteryVoltage}V</td>
                                         <td>
-                                            <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border ${d.brakeStatus === 'APPLIED' ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
-                                                {d.brakeStatus || 'NORMAL'}
-                                            </span>
+                                            <span className="text-xs font-bold text-[#064E3B]">{d.batteryVoltage}V</span>
+                                        </td>
+                                        <td>
+                                            <span className="text-xs font-bold text-[#064E3B]">{d.speed || 0} km/h</span>
+                                        </td>
+                                        <td>
+                                            <div className="flex flex-col">
+                                                <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border w-fit ${d.brakeStatus === 'APPLIED' ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                                                    {d.brakeStatus || 'NORMAL'}
+                                                </span>
+                                                {d.brakeStatus === 'APPLIED' && (
+                                                    <span className="text-[8px] font-mono font-bold text-rose-400 mt-1">
+                                                        {new Date(d.emergencyBrakeTimestamp || d.timestamp).toLocaleTimeString()}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td>
                                             {(() => {
