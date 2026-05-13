@@ -26,7 +26,7 @@ const DeviceList = () => {
 
     const fetchDevices = async () => {
         try {
-            const apiUrl = import.meta.env.VITE_API_URL ;
+            const apiUrl = import.meta.env.VITE_API_URL;
             const res = await axios.get(`${apiUrl}/api/devices`);
             setDevices(res.data);
         } catch (err) {
@@ -44,7 +44,7 @@ const DeviceList = () => {
         setFormSuccess('');
         setFormLoading(true);
         try {
-            const apiUrl = import.meta.env.VITE_API_URL ;
+            const apiUrl = import.meta.env.VITE_API_URL;
             await axios.post(`${apiUrl}/api/devices`, { deviceName, deviceId, location });
             setFormSuccess(`Device added successfully!`);
             setDeviceName(''); setDeviceId(''); setLocation('');
@@ -60,7 +60,7 @@ const DeviceList = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this device?')) return;
         try {
-            const apiUrl = import.meta.env.VITE_API_URL ;
+            const apiUrl = import.meta.env.VITE_API_URL;
             await axios.delete(`${apiUrl}/api/devices/${id}`);
             setDevices(prev => prev.filter(d => d._id !== id));
         } catch (err) {
@@ -120,8 +120,8 @@ const DeviceList = () => {
                         <h3 className="text-xl font-black text-[#064E3B] tracking-tight">Provision New Node</h3>
                     </div>
 
-                    {formError && <div className="p-4 mb-8 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-black uppercase flex items-center gap-3"><AlertCircle size={16}/> {formError}</div>}
-                    {formSuccess && <div className="p-4 mb-8 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase flex items-center gap-3"><PlusCircle size={16}/> {formSuccess}</div>}
+                    {formError && <div className="p-4 mb-8 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-black uppercase flex items-center gap-3"><AlertCircle size={16} /> {formError}</div>}
+                    {formSuccess && <div className="p-4 mb-8 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase flex items-center gap-3"><PlusCircle size={16} /> {formSuccess}</div>}
 
                     <form onSubmit={handleAddDevice} className="grid grid-cols-1 md:grid-cols-4 gap-8">
                         <div className="space-y-2">
@@ -133,8 +133,8 @@ const DeviceList = () => {
                             <input type="text" className="auth-input font-mono border-[#D1FAE5] focus:border-[#10B981]" value={deviceId} onChange={e => setDeviceId(e.target.value)} placeholder="e.g. ESP32_MOD_1" required />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">Initial Deployment</label>
-                            <input type="text" className="auth-input border-[#D1FAE5] focus:border-[#10B981]" value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Lab 4, Section B" required />
+                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">Location</label>
+                            <input type="text" className="auth-input border-[#D1FAE5] focus:border-[#10B981]" value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. India" required />
                         </div>
                         <div className="flex items-end">
                             <button type="submit" disabled={formLoading} className="primary-btn w-full h-[48px] rounded-2xl flex items-center justify-center gap-3 bg-[#10B981] hover:bg-[#059669] shadow-lg shadow-emerald-500/10">

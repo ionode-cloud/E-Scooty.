@@ -161,6 +161,23 @@ exports.downloadExcel = async (req, res) => {
     }
 };
 
+// Fields returned by the simplified /api/escooty endpoints
+const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage brakeStatus gpsLatitude gpsLongitude action timestamp';
+
+// Helper: pick only the core fields from a Mongoose document
+const pickCoreFields = (doc) => ({
+    _id:                doc._id,
+    deviceId:           doc.deviceId,
+    batterySOC:         doc.batterySOC,
+    batterySOH:         doc.batterySOH,
+    batteryVoltage:     doc.batteryVoltage,
+    brakeStatus:        doc.brakeStatus,
+    gpsLatitude:        doc.gpsLatitude,
+    gpsLongitude:       doc.gpsLongitude,
+    action:             doc.action,
+    timestamp:          doc.timestamp,
+});
+
 // Simplified Core API for E-Scooty Dashboard
 exports.syncCoreData = async (req, res) => {
     try {
@@ -200,16 +217,108 @@ exports.syncCoreData = async (req, res) => {
         res.status(201).json({ 
             success: true, 
             message: 'Core telemetry synchronized', 
-            data: {
-                node: deviceId,
-                status: mappedBrakeStatus,
-                action: action || 'TELEMETRY_SYNC'
-            }
+            data: pickCoreFields(newData)
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Kernel sync error', error: error.message });
     }
 };
+
+// GET /api/escooty — fetch telemetry records
+// Query params: deviceId, limit (default 100), startDate, endDate
+exports.getTelemetry = async (req, res) => {
+    try {
+        const { deviceId, limit = 100, startDate, endDate } = req.query;
+
+        const query = {};
+        if (deviceId) query.deviceId = deviceId;
+        if (startDate || endDate) {
+            query.timestamp = {};
+            if (startDate) query.timestamp.$gte = new Date(startDate);
+            if (endDate) query.timestamp.$lte = new Date(endDate);
+        }
+
+        const records = await DeviceData.find(query)
+            .select(CORE_FIELDS)
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .lean();
+
+        res.status(200).json(records);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// PUT /api/escooty — upsert latest telemetry record for a device
+// Same body as POST. Updates the most recent record; creates one if none exists.
+exports.upsertTelemetry = async (req, res) => {
+    try {
+        const { 
+            deviceId, timestamp, batterySOC, batterySOH, batteryVoltage, 
+            brakeStatus, latitude, longitude, action 
+        } = req.body;
+
+        if (!deviceId) return res.status(400).json({ message: 'deviceId is required' });
+
+        const device = await Device.findOne({ deviceId });
+        if (!device) return res.status(404).json({ message: 'Device node not found' });
+
+        device.lastSeen = new Date();
+        await device.save();
+
+        const mappedBrakeStatus = (brakeStatus === 1 || brakeStatus === '1' || brakeStatus === 'APPLIED') ? 'APPLIED' : 'RELEASED';
+        const emergencyBrakeTimestamp = (mappedBrakeStatus === 'APPLIED') ? new Date() : null;
+
+        const payload = {
+            deviceId,
+            timestamp: timestamp ? new Date(timestamp) : new Date(),
+            batterySOC,
+            batterySOH,
+            batteryVoltage,
+            brakeStatus: mappedBrakeStatus,
+            emergencyBrakeTimestamp,
+            gpsLatitude: latitude,
+            gpsLongitude: longitude,
+            action: action || 'TELEMETRY_SYNC'
+        };
+
+        // Find the most recent record for this device and update it, or create new
+        const upserted = await DeviceData.findOneAndUpdate(
+            { deviceId },
+            { $set: payload },
+            { sort: { timestamp: -1 }, upsert: true, new: true }
+        );
+
+        req.io.emit('device-data', upserted);
+
+        res.status(200).json({
+            success: true,
+            message: 'Telemetry record upserted',
+            data: pickCoreFields(upserted)
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Upsert error', error: error.message });
+    }
+};
+
+// DELETE /api/escooty — delete telemetry records by deviceId
+// Query param: deviceId (required)
+exports.deleteTelemetry = async (req, res) => {
+    try {
+        const { deviceId } = req.query;
+        if (!deviceId) return res.status(400).json({ message: 'deviceId query param is required' });
+
+        const result = await DeviceData.deleteMany({ deviceId });
+        res.status(200).json({ 
+            success: true, 
+            message: `Deleted ${result.deletedCount} records for node ${deviceId}` 
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 
 // Update a specific telemetry record
 exports.updateData = async (req, res) => {

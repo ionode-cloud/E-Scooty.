@@ -4,11 +4,19 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 
 ---
 
-## 1. Core Telemetry Synchronization
-**Endpoint:** `POST /api/escooty/dashboard`  
-**Description:** Use this endpoint to send real-time telemetry from the E-Scooty node. This is the primary feed for the Analytics History Buffer and Dashboard Monitor.
+## 1. Core Telemetry Synchronization — `/api/escooty`
 
-### Request Body (JSON)
+All four CRUD operations for telemetry data are handled at the same base endpoint.
+
+---
+
+### `POST /api/escooty` — Create New Telemetry Record
+**Description:** Send real-time telemetry from the E-Scooty node. Creates a **new** record every call.
+
+### `PUT /api/escooty` — Upsert Telemetry Record
+**Description:** Same body as POST. **Updates the most recent record** for the `deviceId`, or creates one if none exists. Use this for live state updates without growing the history.
+
+### Request Body (JSON) — same for POST and PUT
 | Field | Type | Description | Example |
 | :--- | :--- | :--- | :--- |
 | `deviceId` | `String` | **Required**. Unique identifier for the vehicle node. | `"SCOOTY-001"` |
@@ -16,26 +24,103 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 | `batterySOC` | `Number` | State of Charge (0-100). | 85.5 |
 | `batterySOH` | `Number` | State of Health (0-100). | 98.2 |
 | `batteryVoltage` | `Number` | Current battery potential in Volts. | 48.7 |
-| `brakeStatus` | `Number/String` | `1` or `"APPLIED"` if emergency brake is active; else `0` or `"RELEASED"`. | 1 |
+| `brakeStatus` | `Number/String` | `1` or `"APPLIED"` if emergency brake active; else `0` or `"RELEASED"`. | 1 |
 | `latitude` | `Number` | GPS Latitude coordinate. | 22.5726 |
 | `longitude` | `Number` | GPS Longitude coordinate. | 88.3639 |
 | `action` | `String` | Categorical label for the event. | `"TELEMETRY_SYNC"` |
 
-### Success Response (201 Created)
+### POST Success Response (201 Created)
 ```json
-
 {
   "success": true,
   "message": "Core telemetry synchronized",
   "data": {
-    "node": "SCOOTY-001",
-    "status": "APPLIED",
-    "action": "TELEMETRY_SYNC"
+    "_id": "69ef4a069d3e5c70ec96d2ca",
+    "deviceId": "SCOOTY-001",
+    "batterySOC": 85.5,
+    "batterySOH": 98.2,
+    "batteryVoltage": 48.7,
+    "brakeStatus": "APPLIED",
+    "gpsLatitude": 22.5726,
+    "gpsLongitude": 88.3639,
+    "action": "TELEMETRY_SYNC",
+    "timestamp": "2024-04-27T10:00:00.000Z"
+  }
+}
+```
+
+### PUT Success Response (200 OK)
+```json
+{
+  "success": true,
+  "message": "Telemetry record upserted",
+  "data": {
+    "_id": "69ef4a069d3e5c70ec96d2ca",
+    "deviceId": "SCOOTY-001",
+    "batterySOC": 85.5,
+    "batterySOH": 98.2,
+    "batteryVoltage": 48.7,
+    "brakeStatus": "RELEASED",
+    "gpsLatitude": 22.5726,
+    "gpsLongitude": 88.3639,
+    "action": "TELEMETRY_SYNC",
+    "timestamp": "2024-04-27T10:00:00.000Z"
   }
 }
 ```
 
 ---
+
+### `GET /api/escooty` — Fetch Telemetry Records
+**Description:** Returns telemetry records. Supports optional query parameters for filtering.
+
+| Query Param | Type | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `deviceId` | `String` | Filter by vehicle node ID. | All devices |
+| `limit` | `Number` | Max records to return. | `100` |
+| `startDate` | `ISO-8601` | Filter from this date. | — |
+| `endDate` | `ISO-8601` | Filter up to this date. | — |
+
+**Example:** `GET /api/escooty?deviceId=SCOOTY-001&limit=50`
+
+### GET Success Response (200 OK)
+```json
+[
+  {
+    "deviceId": "SCOOTY-001",
+    "batterySOC": 85.5,
+    "batterySOH": 98.2,
+    "batteryVoltage": 48.7,
+    "brakeStatus": "APPLIED",
+    "gpsLatitude": 22.5726,
+    "gpsLongitude": 88.3639,
+    "action": "TELEMETRY_SYNC",
+    "timestamp": "2024-04-27T10:00:00.000Z"
+  }
+]
+```
+
+---
+
+### `DELETE /api/escooty` — Delete Telemetry Records
+**Description:** Permanently deletes **all** telemetry records for the specified device node.
+
+| Query Param | Type | Description |
+| :--- | :--- | :--- |
+| `deviceId` | `String` | **Required**. Node whose records to delete. |
+
+**Example:** `DELETE /api/escooty?deviceId=SCOOTY-001`
+
+### DELETE Success Response (200 OK)
+```json
+{
+  "success": true,
+  "message": "Deleted 47 records for node SCOOTY-001"
+}
+```
+
+---
+
 
 ## 2. Fetch Device History
 **Endpoint:** `GET /api/data/history/:deviceId`  
@@ -112,12 +197,14 @@ Any field from the `DeviceData` schema can be sent.
 The `/api/escooty` namespace provides a unified interface for managing both monitoring dashboards and hardware nodes.
 
 ### 8.1 Dashboard Management
-**Endpoint:** `/api/escooty/dashboard`
+**Base Endpoint:** `/api/escooty`
 
-- **GET `/`**: Retrieve all dashboard configurations.
-  - **Full URL:** `http://localhost:5113/api/escooty/dashboard`
-- **POST `/register`**: Create a new dashboard entry. (Admin)
-  - **Full URL:** `http://localhost:5113/api/escooty/dashboard/register`
+- **GET `/api/escooty`**: Retrieve all dashboard configurations.
+  - **Full URL:** `http://localhost:5113/api/escooty`
+- **POST `/api/escooty`**: Send real-time telemetry data (hardware nodes).
+  - **Full URL:** `http://localhost:5113/api/escooty`
+- **POST `/api/escooty/register`**: Create a new dashboard entry. (Admin)
+  - **Full URL:** `http://localhost:5113/api/escooty/register`
   - **Body (JSON):**
     ```json
     {
@@ -127,8 +214,8 @@ The `/api/escooty` namespace provides a unified interface for managing both moni
       "owner": "Logistics Alpha"
     }
     ```
-- **PUT `/:id`**: Update dashboard details. (Admin)
-  - **Full URL:** `http://localhost:5113/api/escooty/dashboard/{id}`
+- **PUT `/api/escooty/:id`**: Update dashboard details. (Admin)
+  - **Full URL:** `http://localhost:5113/api/escooty/{id}`
   - **Body (JSON):**
     ```json
     {
@@ -136,8 +223,8 @@ The `/api/escooty` namespace provides a unified interface for managing both moni
       "description": "Upgraded with rapid-sync kernel"
     }
     ```
-- **DELETE `/:id`**: Remove a dashboard. (Admin)
-  - **Full URL:** `http://localhost:5113/api/escooty/dashboard/{id}`
+- **DELETE `/api/escooty/:id`**: Remove a dashboard. (Admin)
+  - **Full URL:** `http://localhost:5113/api/escooty/{id}`
 
 ### 8.2 Device Management
 **Endpoint:** `/api/escooty/device`

@@ -83,7 +83,10 @@ exports.getDashboards = async (req, res) => {
     try {
         // If authentication is removed, req.user might be undefined.
         // Return all dashboards if no user filter is applicable.
-        const query = (req.user && req.user.role !== 'admin') ? { user: req.user._id } : {};
+        // Admins and operators see all dashboards; regular users only see their own
+        const query = (req.user && req.user.role !== 'admin' && req.user.role !== 'operator')
+            ? { user: req.user._id }
+            : {};
         const dashboards = await Dashboard.find(query).populate('user', 'email');
         
         // Enrich dashboards with deviceName from the Device model

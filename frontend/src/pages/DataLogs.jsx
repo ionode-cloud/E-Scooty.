@@ -18,6 +18,8 @@ const DataLogs = () => {
     const [selectedLog, setSelectedLog] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { user } = useAuth();
+    const isOperator = user?.role === 'operator';
+    const isAdmin = user?.role === 'admin';
 
     useEffect(() => {
         const fetchDashboards = async () => {
@@ -194,29 +196,32 @@ const DataLogs = () => {
                             <Download size={18} className="group-hover:scale-110 transition-transform" />
                             <span className="uppercase tracking-widest font-black text-[11px]">Export</span>
                         </button>
-                        <div className="relative flex-1">
-                            <input
-                                type="file"
-                                id="xlsx-upload"
-                                className="hidden"
-                                accept=".xlsx"
-                                onChange={handleUpload}
-                                disabled={uploading}
-                            />
-                            <label
-                                htmlFor="xlsx-upload"
-                                className={`h-[44px] w-full flex items-center justify-center gap-2 cursor-pointer rounded-xl border-2 border-dashed border-[#D1FAE5] text-[#10B981] hover:bg-[#10B981]/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                {uploading ? (
-                                    <div className="btn-spinner w-4 h-4 border-2 border-[#10B981]"></div>
-                                ) : (
-                                    <Upload size={18} />
-                                )}
-                                <span className="uppercase tracking-widest font-black text-[11px]">
-                                    {uploading ? 'Parsing...' : 'Upload'}
-                                </span>
-                            </label>
-                        </div>
+                        {/* Upload — Admin only */}
+                        {isAdmin && (
+                            <div className="relative flex-1">
+                                <input
+                                    type="file"
+                                    id="xlsx-upload"
+                                    className="hidden"
+                                    accept=".xlsx"
+                                    onChange={handleUpload}
+                                    disabled={uploading}
+                                />
+                                <label
+                                    htmlFor="xlsx-upload"
+                                    className={`h-[44px] w-full flex items-center justify-center gap-2 cursor-pointer rounded-xl border-2 border-dashed border-[#D1FAE5] text-[#10B981] hover:bg-[#10B981]/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    {uploading ? (
+                                        <div className="btn-spinner w-4 h-4 border-2 border-[#10B981]"></div>
+                                    ) : (
+                                        <Upload size={18} />
+                                    )}
+                                    <span className="uppercase tracking-widest font-black text-[11px]">
+                                        {uploading ? 'Parsing...' : 'Upload'}
+                                    </span>
+                                </label>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -234,7 +239,9 @@ const DataLogs = () => {
                     {/* <span className="text-[10px] font-black text-[#10B981] bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-full uppercase tracking-widest">
                         {deviceData.length} Points Synchronized
                     </span> */}
-                    <button 
+                    {/* Purge button — Admin only */}
+                    {isAdmin && (
+                        <button 
                             onClick={handleClearHistory} 
                             disabled={loading}
                             className="w-[44px] h-[44px] rounded-xl flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100 transition-all shadow-sm group"
@@ -242,6 +249,10 @@ const DataLogs = () => {
                         >
                             <Trash2 size={18} className="group-hover:rotate-12 transition-transform" />
                         </button>
+                    )}
+                    {isOperator && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-full">Read Only</span>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto">

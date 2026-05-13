@@ -29,7 +29,8 @@ exports.addDevice = async (req, res) => {
 exports.getDevices = async (req, res) => {
     try {
         let query = {};
-        if (req.user && req.user.role !== 'admin') {
+        // Admins and operators see ALL devices; regular users only see their own
+        if (req.user && req.user.role !== 'admin' && req.user.role !== 'operator') {
             // Find devices linked to user's dashboards or created by the user
             const userDashboards = await Dashboard.find({ user: req.user._id });
             const userDeviceIds = userDashboards.map(d => d.deviceId);

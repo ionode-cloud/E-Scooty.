@@ -11,6 +11,7 @@ import DevicesAndInfrastructure from './pages/DevicesAndInfrastructure'
 
 import Layout from './components/Layout'
 import AdminRoute from './components/AdminRoute'
+import OperatorRoute from './components/OperatorRoute'
 import './index.css'
 
 function App() {
@@ -37,13 +38,14 @@ function App() {
         {/* Protected Routes */}
         <Route path="/" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
-          <Route path="devices" element={<DeviceList />} />
+          {/* Admin + Operator Routes (read-only access) */}
+          <Route path="devices" element={<OperatorRoute><DeviceList /></OperatorRoute>} />
+          <Route path="logs" element={<OperatorRoute><DataLogs /></OperatorRoute>} />
 
           {/* Admin Only Routes */}
           <Route path="create-dashboard" element={<AdminRoute><CreateDashboard /></AdminRoute>} />
           <Route path="admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
           <Route path="infrastructure" element={<AdminRoute><DevicesAndInfrastructure /></AdminRoute>} />
-          <Route path="logs" element={<AdminRoute><DataLogs /></AdminRoute>} />
 
           {/* Catch-all redirect for /dashboard to index map */}
           <Route path="dashboard" element={<Navigate to="/" replace />} />

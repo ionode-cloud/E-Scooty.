@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { useAuth } from '../context/AuthContext';
 import Chart from 'react-apexcharts';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -39,6 +40,8 @@ const Dashboard = () => {
     const [accidentAlerts, setAccidentAlerts] = useState([]);
     const [emergencyBrakeLogs, setEmergencyBrakeLogs] = useState([]);
     const prevBrakeRef = useRef('RELEASED');
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
 
     const handleDeleteDashboard = async (id, e) => {
         e.stopPropagation();
@@ -65,7 +68,7 @@ const Dashboard = () => {
                 const res = await axios.get(`${apiUrl}/api/dashboards`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const all = res.data || [];
+                const all = Array.isArray(res.data) ? res.data : [];
                 setDashboards(all);
                 if (all.length > 1) setIsSelectingDashboard(true);
                 else if (all.length === 1) setSelectedDashboard(all[0]);
@@ -280,13 +283,15 @@ const Dashboard = () => {
                                         <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#10B981] text-white shadow-lg shadow-emerald-500/20 group-hover:rotate-12 transition-transform duration-500">
                                             <Bike size={28} />
                                         </div>
-                                        <button 
-                                            onClick={(e) => handleDeleteDashboard(d._id, e)}
-                                            className="w-10 h-10 rounded-xl flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100 transition-all opacity-0 group-hover:opacity-100 mt-2"
-                                            title="Delete Dashboard"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        {isAdmin && (
+                                            <button 
+                                                onClick={(e) => handleDeleteDashboard(d._id, e)}
+                                                className="w-10 h-10 rounded-xl flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100 transition-all opacity-0 group-hover:opacity-100 mt-2"
+                                                title="Delete Dashboard"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 h-fit">
                                         <span className="text-[10px] font-black tracking-widest uppercase text-[#10B981]">SYSTEM READY</span>

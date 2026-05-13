@@ -182,3 +182,80 @@ exports.login = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+// POST /api/auth/forgot-password  — send OTP to verified account email
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: 'Email is required.' });
+
+        const user = await User.findOne({ email });
+        if (!user || !user.isVerified) {
+            // Return generic message to avoid account enumeration
+            return res.status(200).json({ message: 'If that email is registered, an OTP has been sent.' });
+        }
+
+        const otp = generateOtp();
+        user.otpCode = otp;
+        user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        await user.save();
+
+        await resend.emails.send({
+            from: 'Fleet Terminal <onboarding@resend.dev>',
+            to: email,
+            subject: 'Reset Your Fleet Terminal Access',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; background: #0F172A; color: #F8FAFC; padding: 32px; border-radius: 12px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                        <div style="width:40px;height:40px;background:#10B981;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;">🛵</div>
+                        <span style="font-size:11px;font-weight:900;color:#10B981;letter-spacing:0.3em;text-transform:uppercase;">Fleet Terminal</span>
+                    </div>
+                    <h2 style="color:#10B981; margin:0 0 8px;">Reset Access</h2>
+                    <p style="color:#94A3B8; margin:0 0 24px;">Use the code below to reset your password. It expires in <strong style="color:#F8FAFC;">10 minutes</strong>.</p>
+                    <div style="font-size:40px; font-weight:bold; letter-spacing:14px; color:#10B981; text-align:center; background:#1E293B; padding:20px; border-radius:10px; margin-bottom:24px;">
+                        ${otp}
+                    </div>
+                    <p style="color:#64748B; font-size:12px;">If you did not request this, you can safely ignore this email.</p>
+                </div>
+            `,
+        });
+
+        res.status(200).json({ message: 'OTP sent to your email.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// POST /api/auth/reset-password  — verify OTP and set new password
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ message: 'Email, OTP, and new password are required.' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        if (!user.otpCode || user.otpCode !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP code.' });
+        }
+        if (user.otpExpiry < new Date()) {
+            return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        user.plainPassword = newPassword;
+        user.otpCode = null;
+        user.otpExpiry = null;
+        await user.save();
+
+        res.status(200).json({ message: 'Password reset successfully. You can now log in.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
