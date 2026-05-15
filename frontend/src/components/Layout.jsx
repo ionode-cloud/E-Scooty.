@@ -12,6 +12,42 @@ const Layout = () => {
     const [currentDate, setCurrentDate] = useState('');
     const location = useLocation();
     const navigate = useNavigate();
+    const [isAlertActive, setIsAlertActive] = useState(false);
+
+    useEffect(() => {
+        const checkAlert = () => {
+            const expiryMapStr = localStorage.getItem('emergencyExpiries');
+            if (expiryMapStr) {
+                const expiryMap = JSON.parse(expiryMapStr);
+                const now = Date.now();
+                const active = Object.values(expiryMap).some(exp => exp > now);
+                setIsAlertActive(active);
+            } else {
+                setIsAlertActive(false);
+            }
+        };
+        checkAlert();
+        const interval = setInterval(checkAlert, 2000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Tab Title Blinking Logic
+    useEffect(() => {
+        let interval;
+        if (isAlertActive) {
+            let toggle = false;
+            interval = setInterval(() => {
+                document.title = toggle ? "🚨 EMERGENCY 🚨" : "E-Scooty Monitor";
+                toggle = !toggle;
+            }, 500);
+        } else {
+            document.title = "E-Scooty Monitor";
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+            document.title = "E-Scooty Monitor";
+        };
+    }, [isAlertActive]);
 
     useEffect(() => {
         const updateDate = () => {
@@ -86,10 +122,13 @@ const Layout = () => {
                                     key={link.path}
                                     to={link.path}
                                     onClick={() => setSidebarOpen(false)}
-                                    className={`sidebar-item ${isActive ? 'active' : ''}`}
+                                    className={`sidebar-item ${isActive ? 'active' : ''} ${link.label === 'Monitor' && isAlertActive ? 'animate-pulse text-red-500 bg-red-500/10 font-black' : ''}`}
                                 >
-                                    <span>{link.icon}</span>
+                                    <span className={link.label === 'Monitor' && isAlertActive ? 'text-red-500' : ''}>{link.icon}</span>
                                     {link.label}
+                                    {link.label === 'Monitor' && isAlertActive && (
+                                        <div className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                                    )}
                                 </Link>
                             );
                         })}

@@ -5,6 +5,8 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path"); // Added path module
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const authRoutes = require("./routes/authRoutes");
 const deviceRoutes = require("./routes/deviceRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -37,6 +39,16 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
+app.use(helmet());
+
+// Rate Limiting (Production Safety)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: "Too many requests from this IP, please try again after 15 minutes"
+});
+app.use("/api/escooty", apiLimiter);
+
 app.use(express.json());
 
 // Serve OTA firmware uploads statically

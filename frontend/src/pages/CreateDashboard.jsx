@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     PlusCircle, Cpu, MapPin, CheckCircle2, AlertCircle, Sparkles, ChevronRight, User,
-    ShieldCheck, MonitorCheck, LayoutGrid, Bike, Mail
+    ShieldCheck, MonitorCheck, LayoutGrid, Bike, Mail, BellRing, Trash2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,6 +13,7 @@ const CreateDashboard = () => {
     const [email, setEmail] = useState(user?.email || '');
     const [password, setPassword] = useState('');
     const [description, setDescription] = useState('');
+    const [emergencyContacts, setEmergencyContacts] = useState(['']);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -38,9 +39,37 @@ const CreateDashboard = () => {
         };
         fetchDevices();
     }, []);
+    
+    const handleAddContact = () => {
+        if (emergencyContacts.length < 5) {
+            setEmergencyContacts([...emergencyContacts, '']);
+        }
+    };
+
+    const handleRemoveContact = (index) => {
+        const newContacts = emergencyContacts.filter((_, i) => i !== index);
+        setEmergencyContacts(newContacts.length ? newContacts : ['']);
+    };
+
+    const handleContactChange = (index, value) => {
+        const newContacts = [...emergencyContacts];
+        newContacts[index] = value;
+        setEmergencyContacts(newContacts);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Indian Phone Validation
+        const indianPhoneRegex = /^(\+91)?[6-9]\d{9}$/;
+        const activeContacts = emergencyContacts.filter(c => c.trim() !== '');
+        
+        const invalid = activeContacts.filter(num => !indianPhoneRegex.test(num));
+        if (invalid.length > 0) {
+            setError(`Invalid Indian phone number(s): ${invalid.join(', ')}`);
+            return;
+        }
+
         setLoading(true);
         setError('');
         setSuccess('');
@@ -51,13 +80,21 @@ const CreateDashboard = () => {
             const token = localStorage.getItem('token');
             const res = await axios.post(
                 `${apiUrl}/api/dashboards`,
-                { dashboardName, deviceId, email, password, description },
+                { 
+                    dashboardName, 
+                    deviceId, 
+                    email, 
+                    password, 
+                    description, 
+                    emergencyContacts: emergencyContacts.filter(c => c.trim() !== '') 
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             setCreatedParticleId(res.data.dashboard.particleId);
             setSuccess('Dashboard initialized successfully!');
             setDashboardName(''); setDeviceId(''); setEmail(''); setPassword(''); setDescription('');
+            setEmergencyContacts(['']);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to create dashboard.');
         } finally {
@@ -168,6 +205,56 @@ const CreateDashboard = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Emergency Contacts Section */}
+                <div className="saas-card p-8 flex flex-col gap-6">
+                    <div className="flex items-center justify-between pb-4 border-b border-[#F1F5F9]">
+                        <div className="flex items-center gap-3">
+                            <BellRing size={18} className="text-[#FF4D4D]" />
+                            <h3 className="text-sm font-black text-[#064E3B] uppercase tracking-wider">Emergency SMS System</h3>
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={handleAddContact}
+                            disabled={emergencyContacts.length >= 5}
+                            className="flex items-center gap-2 text-[10px] font-black text-[#22C55E] uppercase tracking-widest hover:opacity-70 disabled:opacity-30"
+                        >
+                            <PlusCircle size={14} />
+                            Add Number
+                        </button>
+                    </div>
+
+                    <p className="text-xs text-[#6B7280] font-medium leading-relaxed">
+                        Specify up to 5 mobile numbers. These contacts will receive immediate SMS alerts during critical events like battery overheat, accidents, or theft.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {emergencyContacts.map((contact, index) => (
+                            <div key={index} className="space-y-2 relative">
+                                <label className="text-[9px] font-black text-[#94A3B8] uppercase tracking-widest">Contact #{index + 1}</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="tel" 
+                                        className="auth-input text-xs" 
+                                        placeholder="+91 XXXXX XXXXX" 
+                                        value={contact} 
+                                        onChange={(e) => handleContactChange(index, e.target.value)}
+                                        required={index === 0}
+                                    />
+                                    {emergencyContacts.length > 1 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => handleRemoveContact(index)}
+                                            className="w-10 h-10 shrink-0 bg-red-50 text-red-500 rounded-lg flex items-center justify-center border border-red-100 hover:bg-red-500 hover:text-white transition-all"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 

@@ -9,7 +9,8 @@ import 'leaflet/dist/leaflet.css';
 import {
     Zap, MapPin, Battery, AlertTriangle, Shield,
     LayoutGrid, ChevronRight, Trash2, Cpu, Activity,
-    MoreHorizontal, TrendingUp, TrendingDown, BellRing, X, Clock, Bike, FileText
+    MoreHorizontal, TrendingUp, TrendingDown, BellRing, X, Clock, Bike, FileText,
+    Thermometer, ShieldAlert, Siren, LifeBuoy, ShieldCheck
 } from 'lucide-react';
 import '../index.css';
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -34,12 +35,14 @@ const Dashboard = () => {
     const [selectedDashboard, setSelectedDashboard] = useState(null);
     const [deviceData, setDeviceData] = useState([]);
     const [latestData, setLatestData] = useState(null);
-    const [isSelectingDashboard, setIsSelectingDashboard] = useState(false);
+    const [isSelectingDashboard, setIsSelectingDashboard] = useState(true);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [accidentAlerts, setAccidentAlerts] = useState([]);
-    const [emergencyBrakeLogs, setEmergencyBrakeLogs] = useState([]);
-    const prevBrakeRef = useRef('RELEASED');
+    const [alertHistory, setAlertHistory] = useState([]);
+    const [activeEmergencyDeviceIds, setActiveEmergencyDeviceIds] = useState([]);
+    const [emergencyCountdown, setEmergencyCountdown] = useState(0);
+    const sirenActive = activeEmergencyDeviceIds.length > 0;
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
 
@@ -55,8 +58,8 @@ const Dashboard = () => {
             const updated = dashboards.filter(d => d._id !== id);
             setDashboards(updated);
             if (selectedDashboard?._id === id) {
-                setSelectedDashboard(updated.length > 0 ? null : null);
-                if (updated.length > 0) setIsSelectingDashboard(true);
+                setSelectedDashboard(null);
+                setIsSelectingDashboard(true);
             }
         } catch (err) {
             alert('Failed to delete dashboard.');
@@ -73,13 +76,78 @@ const Dashboard = () => {
                 });
                 const all = Array.isArray(res.data) ? res.data : [];
                 setDashboards(all);
-                if (all.length > 1) setIsSelectingDashboard(true);
-                else if (all.length === 1) setSelectedDashboard(all[0]);
+
+                // Persistence Logic: Restore selected dashboard from localStorage if desired,
+                // but keep the selection grid visible on every fresh navigation.
+                const savedId = localStorage.getItem('lastSelectedDashboardId');
+                if (savedId && all.length > 0) {
+                    const saved = all.find(d => d._id === savedId);
+                    if (saved) setSelectedDashboard(saved);
+                }
+                
+                setIsSelectingDashboard(true); // Always show grid first on tab click
             } catch (err) {
                 console.error("Dashboard fetch error:", err);
             }
         };
         fetchDashboards();
+    }, []);
+
+    // Persistence Logic: Restore selected dashboard and active alerts from localStorage
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const expiryMapStr = localStorage.getItem('emergencyExpiries');
+            const expiryMap = expiryMapStr ? JSON.parse(expiryMapStr) : {};
+            const now = Date.now();
+            
+            // Update active IDs
+            const activeIds = Object.keys(expiryMap).filter(id => expiryMap[id] > now);
+            if (JSON.stringify(activeIds) !== JSON.stringify(activeEmergencyDeviceIds)) {
+                setActiveEmergencyDeviceIds(activeIds);
+            }
+
+            // Update countdown for current dashboard
+            if (selectedDashboard?.deviceId && expiryMap[selectedDashboard.deviceId]) {
+                const remaining = Math.max(0, Math.floor((expiryMap[selectedDashboard.deviceId] - now) / 1000));
+                setEmergencyCountdown(remaining);
+            } else {
+                setEmergencyCountdown(0);
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [activeEmergencyDeviceIds, selectedDashboard]);
+
+    // Save selection to localStorage
+    useEffect(() => {
+        if (selectedDashboard?._id) {
+            localStorage.setItem('lastSelectedDashboardId', selectedDashboard._id);
+        }
+    }, [selectedDashboard]);
+
+
+    // Audio siren removed per user request
+
+    // Audio logic removed for silent alerts
+
+    useEffect(() => {
+        const socket = io(import.meta.env.VITE_API_URL);
+
+        socket.on('emergency-alert', (alert) => {
+            // Update active IDs globally
+            setActiveEmergencyDeviceIds(prev => Array.from(new Set([...prev, alert.deviceId])));
+            
+            // Save expiry to map
+            const expiry = Date.now() + 120000;
+            const currentExpiries = JSON.parse(localStorage.getItem('emergencyExpiries') || '{}');
+            currentExpiries[alert.deviceId] = expiry;
+            localStorage.setItem('emergencyExpiries', JSON.stringify(currentExpiries));
+        });
+
+        return () => {
+            socket.off('emergency-alert');
+            socket.disconnect();
+        };
     }, []);
 
     useEffect(() => {
@@ -90,93 +158,103 @@ const Dashboard = () => {
         socket.on('device-data', (data) => {
             if (data.deviceId === selectedDashboard.deviceId) {
                 setLatestData(data);
-                // Update history series for charts
-                setDeviceData(prev => {
-                    const exists = prev.some(d => d._id === data._id || d.timestamp === data.timestamp);
-                    if (exists) return prev;
-                    return [data, ...prev].slice(0, 200);
-                });
-
-                // Live update emergency logs
-                if (data.brakeStatus === 'APPLIED') {
-                    setEmergencyBrakeLogs(prev => {
-                        const exists = prev.some(log => log.id === data._id);
-                        if (exists) return prev;
-                        return [{
-                            id: data._id || Date.now(),
-                            timestamp: new Date(data.emergencyBrakeTimestamp || data.timestamp),
-                            deviceId: data.deviceId
-                        }, ...prev].slice(0, 50);
-                    });
-                }
+                setDeviceData(prev => [data, ...prev].slice(0, 200));
             }
         });
 
         const fetchData = async () => {
             try {
                 const apiUrl = import.meta.env.VITE_API_URL;
-                const historyUrl = `${apiUrl}/api/vehicle/history?deviceId=${selectedDashboard.deviceId}&limit=100`
-                    + (startDate ? `&startDate=${startDate}` : '')
-                    + (endDate ? `&endDate=${endDate}` : '');
-
-                const [latestRes, historyRes, emergencyRes] = await Promise.all([
-                    axios.get(`${apiUrl}/api/vehicle/latest?deviceId=${selectedDashboard.deviceId}`),
-                    axios.get(historyUrl),
-                    axios.get(`${apiUrl}/api/emergency-logs/${selectedDashboard.deviceId}`)
+                const token = localStorage.getItem('token');
+                const [telemetryRes, alertsRes] = await Promise.all([
+                    axios.get(`${apiUrl}/api/history/${selectedDashboard.deviceId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                    axios.get(`${apiUrl}/api/alerts/${selectedDashboard.deviceId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    })
                 ]);
-
-                if (emergencyRes.data) {
-                    setEmergencyBrakeLogs(emergencyRes.data.map(log => ({
-                        id: log._id,
-                        timestamp: new Date(log.emergencyBrakeTimestamp || log.timestamp),
-                        deviceId: log.deviceId
-                    })));
+                setDeviceData(telemetryRes.data);
+                setAlertHistory(alertsRes.data);
+                if (telemetryRes.data.length > 0) {
+                    setLatestData(telemetryRes.data[0]);
                 }
-
-                if (latestRes.data && Object.keys(latestRes.data).length > 0) {
-                    const data = latestRes.data;
-                    setLatestData(data);
-
-                    // Detect accident
-                    if (data.accidentDetected) {
-                        const lat = data.gpsLatitude;
-                        const lng = data.gpsLongitude;
-                        const mapsLink = (lat && lng) ? `https://www.google.com/maps?q=${lat},${lng}` : null;
-                        const alert = {
-                            id: Date.now(),
-                            timestamp: new Date(data.timestamp),
-                            deviceId: data.deviceId,
-                            mapsLink,
-                            lat, lng,
-                        };
-                        setAccidentAlerts(prev => {
-                            const alreadyExists = prev.some(a => Math.abs(new Date(a.timestamp) - new Date(data.timestamp)) < 5000);
-                            return alreadyExists ? prev : [alert, ...prev].slice(0, 5);
-                        });
-                    }
-
-                    // Update brake state ref for other logic if needed
-                    prevBrakeRef.current = data.brakeStatus;
-                }
-                if (historyRes.data) setDeviceData([...historyRes.data].reverse());
             } catch (error) {
                 console.error('Error fetching vehicle data:', error);
             }
         };
         fetchData();
         const interval = setInterval(fetchData, 5000);
+
+        socket.on('emergency-alert', (alert) => {
+            if (selectedDashboard && alert.deviceId === selectedDashboard.deviceId) {
+                setAlertHistory(prev => [alert, ...prev].slice(0, 50));
+            }
+        });
+
         return () => {
             clearInterval(interval);
+            socket.off('device-data');
+            socket.off('emergency-alert');
             socket.disconnect();
         };
     }, [selectedDashboard, startDate, endDate]);
+
+    const handleManualEmergency = async (alertType) => {
+        if (!selectedDashboard) return;
+        if (!window.confirm(`Are you sure you want to trigger a "${alertType}" alert for ${selectedDashboard.deviceId}?`)) return;
+
+        try {
+            const apiUrl = import.meta.env.VITE_API_URL;
+            const token = localStorage.getItem('token');
+            
+            // Trigger local visual immediately via localStorage map
+            const expiry = Date.now() + 120000;
+            const currentExpiries = JSON.parse(localStorage.getItem('emergencyExpiries') || '{}');
+            currentExpiries[selectedDashboard.deviceId] = expiry;
+            localStorage.setItem('emergencyExpiries', JSON.stringify(currentExpiries));
+
+            const res = await axios.post(`${apiUrl}/api/escooty/emergency`, {
+                deviceId: selectedDashboard.deviceId,
+                alertType
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(res.data.message);
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to trigger emergency alert.');
+        }
+    };
+
+    const handleClearAlertHistory = async () => {
+        if (!selectedDashboard) return;
+        if (!window.confirm("CRITICAL: This will permanently purge the emergency alert history for this node. Proceed?")) return;
+
+        try {
+            const apiUrl = import.meta.env.VITE_API_URL;
+            const token = localStorage.getItem('token');
+            await axios.delete(`${apiUrl}/api/alerts/${selectedDashboard.deviceId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAlertHistory([]);
+        } catch (error) {
+            console.error("Failed to clear alert history", error);
+            alert("Unauthorized: Access Denied.");
+        }
+    };
+
+    const getTempColor = (temp) => {
+        if (temp <= 40) return '#10B981';
+        if (temp <= 55) return '#F59E0B';
+        return '#EF4444';
+    };
 
     const kpis = [
         {
             icon: <Bike size={24} />,
             label: 'Battery SOC',
-            value: latestData?.batterySOC !== undefined && latestData?.batterySOC !== null 
-                ? Number(latestData.batterySOC).toFixed(1) 
+            value: latestData?.batterySOC !== undefined && latestData?.batterySOC !== null
+                ? Number(latestData.batterySOC).toFixed(1)
                 : '0.0',
             unit: '%',
             grad: (latestData?.batterySOC < 20) ? 'grad-emergency' : 'grad-emerald',
@@ -185,9 +263,9 @@ const Dashboard = () => {
         {
             icon: <Shield size={24} />,
             label: 'Battery SOH',
-            value: latestData?.batterySOH !== undefined && latestData?.batterySOH !== null 
-                ? Number(latestData.batterySOH).toFixed(1) 
-                : '100.0',
+            value: latestData?.batterySOH !== undefined && latestData?.batterySOH !== null
+                ? Number(latestData.batterySOH).toFixed(1)
+                : '0',
             unit: '%',
             grad: 'grad-emerald',
             sub: 'Health indicator',
@@ -203,8 +281,8 @@ const Dashboard = () => {
         {
             icon: <Activity size={24} />,
             label: 'Current Speed',
-            value: latestData?.speed !== undefined && latestData?.speed !== null 
-                ? Number(latestData.speed).toFixed(1) 
+            value: latestData?.speed !== undefined && latestData?.speed !== null
+                ? Number(latestData.speed).toFixed(1)
                 : '0.0',
             unit: 'km/h',
             grad: 'grad-emerald',
@@ -235,8 +313,6 @@ const Dashboard = () => {
     };
 
     const socSeries = [{ name: 'SOC %', data: deviceData.map(d => ({ x: new Date(d.timestamp).getTime(), y: d.batterySOC })) }];
-    const voltageSeries = [{ name: 'Voltage V', data: deviceData.map(d => ({ x: new Date(d.timestamp).getTime(), y: d.batteryVoltage })) }];
-    const sohSeries = [{ name: 'SOH %', data: deviceData.map(d => ({ x: new Date(d.timestamp).getTime(), y: d.batterySOH ?? 0 })) }];
 
     const rawLat = latestData?.gpsLatitude;
     const rawLng = latestData?.gpsLongitude;
@@ -247,113 +323,149 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-
-            {/* Accident Alert Banners */}
-            {accidentAlerts.length > 0 && (
-                <div className="space-y-3">
-                    {accidentAlerts.map(alert => (
-                        <div key={alert.id} className="flex items-start gap-4 grad-dark text-[#FF4D4D] rounded-2xl px-5 py-4 shadow-2xl border border-white/10 animate-pulse">
-                            <BellRing size={22} className="shrink-0 mt-0.5 text-[#FF4D4D]" />
-                            <div className="flex-1 min-w-0">
-                                <p className="font-black text-sm uppercase tracking-widest text-[#FF4D4D]">🚨 Accident Detected!</p>
-                                <p className="text-xs mt-1 text-white/80 font-bold">
-                                    Emergency — crash detected at{' '}
-                                    {alert.mapsLink
-                                        ? <a href={alert.mapsLink} target="_blank" rel="noreferrer" className="underline font-black text-[#FF4D4D]">{alert.mapsLink}</a>
-                                        : `Device Node: ${alert.deviceId}`}
-                                </p>
-                                <p className="text-[10px] text-white/40 mt-1 font-black uppercase tracking-tighter">Event Time: {alert.timestamp.toLocaleString()}</p>
-                            </div>
-                            <button onClick={() => setAccidentAlerts(prev => prev.filter(a => a.id !== alert.id))} className="text-white/30 hover:text-[#FF4D4D] transition-colors">
-                                <X size={16} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {isSelectingDashboard ? (
+            {isSelectingDashboard || !selectedDashboard ? (
                 <div className="space-y-10">
                     <header className="flex flex-col gap-2">
-                        <h1 className="text-3xl font-black text-[#064E3B] tracking-tight">E-Scooty Dashboards</h1>
-                        <p className="text-sm text-[#6B7280] font-medium">Select a connected vehicle node to initialize telemetry stream.</p>
+                        <h1 className={`text-3xl font-black tracking-tight transition-all duration-500 ${sirenActive ? 'text-red-600 animate-pulse' : 'text-[#064E3B]'}`}>
+                            {sirenActive && <Siren size={28} className="inline-block mr-3 animate-ping" />}
+                            E-Scooty Dashboards
+                        </h1>
+                        <p className={`text-sm font-medium transition-colors ${sirenActive ? 'text-red-500' : 'text-[#6B7280]'}`}>
+                            {sirenActive ? 'CRITICAL ALERT DETECTED IN FLEET - INITIALIZE MONITOR IMMEDIATELY' : 'Select a connected vehicle node to initialize telemetry stream.'}
+                        </p>
                     </header>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {dashboards.map((d) => (
-                            <div
-                                key={d._id}
-                                onClick={() => { setSelectedDashboard(d); setIsSelectingDashboard(false); }}
-                                className="bg-white border-2 border-[#D1FAE5] rounded-[32px] group cursor-pointer hover:border-[#10B981] hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-500 p-8 relative overflow-hidden"
-                            >
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-
-                                <div className="flex justify-between items-start relative z-10">
-                                    <div className="flex gap-4">
-                                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#10B981] text-white shadow-lg shadow-emerald-500/20 group-hover:rotate-12 transition-transform duration-500">
-                                            <Bike size={28} />
+                        {dashboards.map((d) => {
+                            const isAlerting = activeEmergencyDeviceIds.includes(d.deviceId);
+                            return (
+                                <div
+                                    key={d._id}
+                                    onClick={() => { setSelectedDashboard(d); setIsSelectingDashboard(false); }}
+                                    className={`bg-white border-2 rounded-[32px] group cursor-pointer transition-all duration-500 p-8 relative overflow-hidden
+                                        ${isAlerting ? 'animate-pulse border-red-500 shadow-[0_0_40px_rgba(255,0,0,0.3)]' : 'border-[#D1FAE5] hover:border-[#10B981] hover:shadow-2xl hover:shadow-emerald-500/10'}
+                                    `}
+                                >
+                                    {isAlerting && (
+                                        <div className="absolute inset-0 bg-red-500/5 pointer-events-none animate-pulse"></div>
+                                    )}
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
+                                    <div className="flex justify-between items-start relative z-10">
+                                        <div className="flex gap-4">
+                                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#10B981] text-white shadow-lg shadow-emerald-500/20 group-hover:rotate-12 transition-transform duration-500">
+                                                <Bike size={28} />
+                                            </div>
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={(e) => handleDeleteDashboard(d._id, e)}
+                                                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100 transition-all opacity-0 group-hover:opacity-100 mt-2"
+                                                    title="Delete Dashboard"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
                                         </div>
-                                        {isAdmin && (
-                                            <button 
-                                                onClick={(e) => handleDeleteDashboard(d._id, e)}
-                                                className="w-10 h-10 rounded-xl flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white border border-rose-100 transition-all opacity-0 group-hover:opacity-100 mt-2"
-                                                title="Delete Dashboard"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 h-fit">
-                                        <span className="text-[10px] font-black tracking-widest uppercase text-[#10B981]">SYSTEM READY</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-8 relative z-10">
-                                    <h3 className="text-xl font-black text-[#064E3B] leading-tight group-hover:text-[#10B981] transition-colors">{d.dashboardName}</h3>
-                                    <div className="space-y-1.5 mt-3">
-                                        <div className="flex items-center gap-2 text-[#6B7280]">
-                                            <MapPin size={12} className="text-[#10B981]" />
-                                            <span className="text-[10px] font-bold uppercase tracking-wider">{d.location || 'Fleet Node'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[#6B7280]">
-                                            <FileText size={12} className="text-[#10B981]" />
-                                            <span className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">By: </span>
-                                            <span className="text-[10px] font-bold text-[#064E3B] lowercase">{d.user?.email || 'N/A'}</span>
+                                        <div className="bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 h-fit">
+                                            <span className="text-[10px] font-black tracking-widest uppercase text-[#10B981]">SYSTEM READY</span>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div className="mt-8 flex items-center justify-between relative z-10 pt-6 border-t border-[#D1FAE5]">
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-[#94A3B8] uppercase tracking-widest">Device ID</span>
-                                        <span className="text-xs font-mono font-bold text-[#064E3B]">{d.deviceId}</span>
+                                    <div className="mt-8 relative z-10">
+                                        <h3 className="text-xl font-black text-[#064E3B] leading-tight group-hover:text-[#10B981] transition-colors">{d.dashboardName}</h3>
+                                        <div className="space-y-1.5 mt-3">
+                                            <div className="flex items-center gap-2 text-[#6B7280]">
+                                                <MapPin size={12} className="text-[#10B981]" />
+                                                <span className="text-[10px] font-bold uppercase tracking-wider">{d.location || 'Fleet Node'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[#6B7280]">
+                                                <FileText size={12} className="text-[#10B981]" />
+                                                <span className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">By: </span>
+                                                <span className="text-[10px] font-bold text-[#064E3B] lowercase">{d.user?.email || 'N/A'}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="w-8 h-8 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] group-hover:bg-[#10B981] group-hover:text-white transition-all duration-300">
-                                        <ChevronRight size={18} />
+                                    <div className="mt-8 flex items-center justify-between relative z-10 pt-6 border-t border-[#D1FAE5]">
+                                        <div className="flex flex-col">
+                                            <span className="text-[9px] font-black text-[#94A3B8] uppercase tracking-widest">Device ID</span>
+                                            <span className="text-xs font-mono font-bold text-[#064E3B]">{d.deviceId}</span>
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] group-hover:bg-[#10B981] group-hover:text-white transition-all duration-300">
+                                            <ChevronRight size={18} />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             ) : (
-                <>
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                        <div className="flex items-center gap-5">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#064E3B] shadow-lg shadow-black/20">
-                                <Bike size={28} className="text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-black text-[#064E3B] tracking-tight">E-Scooty Monitor</h1>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em]">Real-time Telemetry Terminal</p>
-                                    <div className="w-1 h-1 rounded-full bg-[#10B981]"></div>
-                                    <p className="text-[10px] font-bold text-[#10B981] lowercase">By: {selectedDashboard?.user?.email || 'N/A'}</p>
+                <div className={`min-h-screen bg-[#F8FAFC] p-4 md:p-8 flex flex-col gap-8 transition-colors duration-500 ${sirenActive ? 'animate-siren' : ''}`}>
+                    <>
+                        {sirenActive && (
+                            <div className="mb-8 p-8 bg-[#FF0000] text-white rounded-[40px] shadow-[0_0_50px_rgba(255,0,0,0.4)] flex flex-col md:flex-row items-center justify-between animate-pulse border-4 border-white/20 gap-6">
+                                <div className="flex items-center gap-6">
+                                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center animate-ping">
+                                        <Siren size={40} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-3xl font-black uppercase tracking-tighter">🚨 ACCIDENT DETECTED</h2>
+                                        <div className="flex items-center gap-3 mt-1">
+                                            <p className="text-sm font-bold opacity-90 uppercase tracking-widest">Vehicle: {selectedDashboard?.dashboardName || selectedDashboard?.deviceId}</p>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+                                            <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-lg backdrop-blur-sm border border-white/20">
+                                                <Clock size={14} className="animate-spin" style={{ animationDuration: '3s' }} />
+                                                <span className="text-sm font-black font-mono">{emergencyCountdown}s REMAINING</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-4">
+                                    {hasGPS && (
+                                        <a
+                                            href={`https://www.google.com/maps?q=${lat},${lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-8 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-full font-black text-sm uppercase tracking-widest transition-all border border-white/30 flex items-center gap-2"
+                                        >
+                                            <MapPin size={18} />
+                                            View on Google Maps
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setActiveEmergencyDeviceIds(prev => prev.filter(id => id !== selectedDashboard.deviceId));
+                                            const latestMap = JSON.parse(localStorage.getItem('emergencyExpiries') || '{}');
+                                            delete latestMap[selectedDashboard.deviceId];
+                                            localStorage.setItem('emergencyExpiries', JSON.stringify(latestMap));
+                                        }}
+                                        className="px-8 py-3 bg-white text-[#FF0000] rounded-full font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
+                                    >
+                                        Dismiss Alert
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4">
-            
+                        )}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#064E3B] shadow-lg shadow-black/20">
+                                    <Bike size={28} className="text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl font-black text-[#064E3B] tracking-tight">E-Scooty Monitor</h1>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em]">Real-time Telemetry Terminal</p>
+                                        <div className="w-1 h-1 rounded-full bg-[#10B981]"></div>
+                                        <p className="text-[10px] font-bold text-[#10B981] lowercase">By: {selectedDashboard?.user?.email || 'N/A'}</p>
+                                        {selectedDashboard?.emergencyContacts?.length > 0 && (
+                                            <>
+                                                <div className="w-1 h-1 rounded-full bg-[#CBD5E1]"></div>
+                                                <div className="flex items-center gap-1.5 bg-[#F1F5F9] px-2 py-0.5 rounded-md border border-[#E2E8F0]">
+                                                    <span className="text-[9px] font-black text-[#64748B] uppercase tracking-wider">SMS Alert To:</span>
+                                                    <span className="text-[9px] font-bold text-[#064E3B]">{selectedDashboard.emergencyContacts.join(', ')}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                             <select
                                 className="bg-white border border-[#E5E7EB] rounded-2xl px-5 py-3 text-sm font-bold text-[#064E3B] outline-none shadow-sm min-w-[200px]"
                                 value={selectedDashboard?._id || ''}
@@ -362,14 +474,9 @@ const Dashboard = () => {
                                 {dashboards.map(d => <option key={d._id} value={d._id}>{d.dashboardName}</option>)}
                             </select>
                         </div>
-                    </div>
-
-                    {/* Main Content Grid */}
-                    <div className="modern-grid-container">
-                        {/* KPI Grid */}
-                        <div className="space-y-6">
-                            <h2 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em]">Quick Metrics</h2>
-                            <div className="modern-small-grid">
+                        <div className="space-y-4">
+                            <h2 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em] ml-1">Operational Telemetry</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {kpis.map((k, i) => (
                                     <div key={i} className={`modern-kpi ${k.grad}`}>
                                         <div className="modern-icon-box">{k.icon}</div>
@@ -383,13 +490,46 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                 ))}
+                                <div className="modern-kpi grad-dark border border-white/5 relative overflow-hidden group">
+                                    <div className="modern-icon-box bg-white/10 text-white">
+                                        <Thermometer size={20} />
+                                    </div>
+                                    <div className="mt-auto relative z-10">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="modern-value">{latestData?.batteryTemperature ?? '—'}</span>
+                                            <span className="text-sm font-bold opacity-60">°C</span>
+                                        </div>
+                                        <p className="modern-label mt-1">Battery Temp</p>
+                                        <p className="modern-sub-value mt-0.5" style={{ color: getTempColor(latestData?.batteryTemperature || 0) }}>
+                                            {latestData?.warningLevel || 'Normal State'}
+                                        </p>
+                                    </div>
+                                    <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Thermometer size={80} />
+                                    </div>
+                                </div>
+
+                                {/* Accident Trigger Card */}
+                                <button
+                                    onClick={() => handleManualEmergency('Accident Detected')}
+                                    className="modern-kpi bg-rose-500/10 border border-rose-500/20 hover:bg-rose-600 transition-all group text-left"
+                                >
+                                    <div className="modern-icon-box bg-rose-500 text-white group-hover:bg-white group-hover:text-rose-600 transition-colors">
+                                        <Siren size={20} />
+                                    </div>
+                                    <div className="mt-auto">
+                                        <p className="modern-value text-rose-600 text-white transition-colors">TRIGGER</p>
+                                        <p className="modern-label mt-1 text-rose-600/80 text-white/80">Accident Alert</p>
+                                        <p className="modern-sub-value mt-0.5 text-rose-600/80text-white/40">Manual SMS Sync</p>
+                                    </div>
+                                </button>
                             </div>
                         </div>
 
-                        {/* Activity Chart */}
-                        <div className="space-y-6">
-                            <h2 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em]">Activity Chart</h2>
-                            <div className="modern-chart-card">
+
+                        <div className="space-y-4">
+                            <h2 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em] ml-1">Live Activity Stream</h2>
+                            <div className="modern-chart-card w-full">
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <h3 className="text-xl font-black text-white tracking-tight">Real-time Data Stream</h3>
@@ -400,12 +540,9 @@ const Dashboard = () => {
                                             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
                                             <span className="text-[9px] font-black uppercase tracking-widest text-white">Live</span>
                                         </div>
-                                        <button className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
-                                            <MoreHorizontal size={20} />
-                                        </button>
                                     </div>
                                 </div>
-                                <div className="h-[280px] -ml-4">
+                                <div className="h-[260px] -ml-4">
                                     <Chart
                                         options={barOptions}
                                         series={socSeries}
@@ -414,113 +551,137 @@ const Dashboard = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Location + Emergency Brake Log */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Live GPS Map */}
-                        <div className="lg:col-span-2 premium-kpi grad-dark p-8 flex flex-col" style={{ minHeight: '420px' }}>
-                            <div className="sparkline-bg opacity-10" />
-                            <div className="flex justify-between items-center mb-4 relative z-10 text-white">
-                                <div className="flex items-center gap-3">
-                                    <div className="glass-icon"><MapPin size={20} /></div>
-                                    <div>
-                                        <h3 className="text-lg font-black tracking-tight">Live Location Tracking</h3>
-                                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mt-1">Real-time GPS</p>
+                        {/* Location + Emergency History */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" style={{ maxHeight: "500px" }}>
+                            {/* Live GPS Map */}
+                            <div className="lg:col-span-2 premium-kpi grad-dark p-8 flex flex-col" style={{ minHeight: '420px' }}>
+                                <div className="sparkline-bg opacity-10" />
+                                <div className="flex justify-between items-center mb-4 relative z-10 text-white">
+                                    <div className="flex items-center gap-3">
+                                        <div className="glass-icon"><MapPin size={20} /></div>
+                                        <div>
+                                            <h3 className="text-lg font-black tracking-tight">Live Location Tracking</h3>
+                                            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mt-1">Real-time GPS</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        {hasGPS ? (
+                                            <>
+                                                <p className="text-[10px] font-mono font-bold text-white/80 tracking-widest">{lat.toFixed(6)}°N</p>
+                                                <p className="text-[10px] font-mono font-bold text-white/80 tracking-widest">{lng.toFixed(6)}°E</p>
+                                                <a
+                                                    href={`https://www.google.com/maps?q=${lat},${lng}`}
+                                                    target="_blank" rel="noreferrer"
+                                                    className="text-[10px] text-blue-300 underline font-bold mt-1 inline-block"
+                                                >Open in Google Maps ↗</a>
+                                            </>
+                                        ) : (
+                                            <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">No Signal</p>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="flex-1 rounded-2xl overflow-hidden border border-white/5 bg-[#064E3B] relative z-10" style={{ minHeight: '300px' }}>
                                     {hasGPS ? (
-                                        <>
-                                            <p className="text-[10px] font-mono font-bold text-white/80 tracking-widest">{lat.toFixed(6)}°N</p>
-                                            <p className="text-[10px] font-mono font-bold text-white/80 tracking-widest">{lng.toFixed(6)}°E</p>
-                                            <a
-                                                href={`https://www.google.com/maps?q=${lat},${lng}`}
-                                                target="_blank" rel="noreferrer"
-                                                className="text-[10px] text-blue-300 underline font-bold mt-1 inline-block"
-                                            >Open in Google Maps ↗</a>
-                                        </>
+                                        <MapContainer key={selectedDashboard?.deviceId} center={mapCenter} zoom={15} style={{ height: '100%', width: '100%', minHeight: '300px' }} zoomControl={false}>
+                                            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://carto.com/">CARTO</a>' />
+                                            <MapUpdater lat={lat} lng={lng} />
+                                            <Marker position={[lat, lng]}>
+                                                <Popup>
+                                                    <strong>E-Scooty Location</strong><br />
+                                                    Lat: {lat.toFixed(6)}<br />
+                                                    Lng: {lng.toFixed(6)}<br />
+                                                    <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer">📍 Open in Google Maps</a>
+                                                </Popup>
+                                            </Marker>
+                                        </MapContainer>
                                     ) : (
-                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">No Signal</p>
+                                        <div className="h-full w-full flex flex-col items-center justify-center gap-3" style={{ minHeight: '300px' }}>
+                                            <MapPin size={36} className="text-white/20" />
+                                            <p className="text-[11px] font-black text-white/30 uppercase tracking-[0.2em]">Awaiting GPS Signal...</p>
+                                            <div className="w-2 h-2 rounded-full bg-white/20 animate-pulse" />
+                                        </div>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex-1 rounded-2xl overflow-hidden border border-white/5 bg-[#064E3B] relative z-10" style={{ minHeight: '300px' }}>
-                                {hasGPS ? (
-                                    <MapContainer key={selectedDashboard?.deviceId} center={mapCenter} zoom={15} style={{ height: '100%', width: '100%', minHeight: '300px' }} zoomControl={false}>
-                                        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://carto.com/">CARTO</a>' />
-                                        <MapUpdater lat={lat} lng={lng} />
-                                        <Marker position={[lat, lng]}>
-                                            <Popup>
-                                                <strong>E-Scooty Location</strong><br />
-                                                Lat: {lat.toFixed(6)}<br />
-                                                Lng: {lng.toFixed(6)}<br />
-                                                <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer">📍 Open in Google Maps</a>
-                                            </Popup>
-                                        </Marker>
-                                    </MapContainer>
-                                ) : (
-                                    <div className="h-full w-full flex flex-col items-center justify-center gap-3" style={{ minHeight: '300px' }}>
-                                        <MapPin size={36} className="text-white/20" />
-                                        <p className="text-[11px] font-black text-white/30 uppercase tracking-[0.2em]">Awaiting GPS Signal...</p>
-                                        <div className="w-2 h-2 rounded-full bg-white/20 animate-pulse" />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
 
-                        {/* Emergency Brake Log */}
-                        <div className="premium-kpi grad-dark p-6 flex flex-col" style={{ minHeight: '420px' }}>
-                            <div className="flex items-center gap-3 mb-5 relative z-10">
-                                <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-[#FF4D4D] border border-white/10">
-                                    <Activity size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-black tracking-tight text-[#FF4D4D]">Emergency Brake</h3>
-                                    <p className="text-[10px] font-black text-[#FF4D4D]/60 uppercase tracking-[0.2em] mt-0.5">Timestamp Log</p>
-                                </div>
-                            </div>
-                            <div className="flex-1 overflow-hidden relative z-10">
-                                {emergencyBrakeLogs.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-white/20 gap-2">
-                                        <Shield size={32} />
-                                        <p className="text-[11px] font-black uppercase tracking-widest">Safe State</p>
+                            {/* Emergency Alert History */}
+                            <div className="premium-kpi grad-dark p-6 flex flex-col" style={{ height: '500px' }}>
+                                <div className="flex items-center justify-between mb-5 relative z-10">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-[#FF4D4D] border border-white/10">
+                                            <BellRing size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-black tracking-tight text-[#FF4D4D]">Emergency History</h3>
+                                            <p className="text-[10px] font-black text-[#FF4D4D]/60 uppercase tracking-[0.2em] mt-0.5">Critical Incident Log</p>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="overflow-y-auto h-full custom-scrollbar">
-                                        <table className="w-full text-left border-separate border-spacing-y-2">
-                                            <thead>
-                                                <tr>
-                                                    <th className="text-[9px] font-black uppercase tracking-widest text-[#FF4D4D]/40 px-4 pb-2">Timestamp</th>
-                                                    <th className="text-[9px] font-black uppercase tracking-widest text-[#FF4D4D]/40 px-4 pb-2">Signal</th>
-                                                    <th className="text-[9px] font-black uppercase tracking-widest text-[#FF4D4D]/40 px-4 pb-2 text-right">Node</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {emergencyBrakeLogs.map(log => (
-                                                    <tr key={log.id} className="group">
-                                                        <td className="bg-white/5 border-l border-y border-white/10 rounded-l-xl px-4 py-3 text-[10px] font-mono font-bold text-white/80 group-hover:bg-white/10 transition-colors">
-                                                            {log.timestamp.toLocaleTimeString()}
-                                                            <span className="block text-[8px] opacity-40 mt-0.5">{log.timestamp.toLocaleDateString()}</span>
-                                                        </td>
-                                                        <td className="bg-white/5 border-y border-white/10 px-4 py-3 group-hover:bg-white/10 transition-colors">
-                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-[#FF4D4D]/10 text-[#FF4D4D] border border-[#FF4D4D]/20">
-                                                                Engaged
-                                                            </span>
-                                                        </td>
-                                                        <td className="bg-white/5 border-r border-y border-white/10 rounded-r-xl px-4 py-3 text-[10px] font-black text-white/40 text-right group-hover:bg-white/10 transition-colors">
-                                                            {log.deviceId}
-                                                        </td>
+                                    <button 
+                                        onClick={handleClearAlertHistory}
+                                        className="p-2.5 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-rose-400 hover:bg-rose-400/10 transition-all group"
+                                        title="Clear Alert History"
+                                    >
+                                        <Trash2 size={16} className="group-hover:rotate-12 transition-transform" />
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-hidden relative z-10">
+                                    {alertHistory.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-white/20 gap-2">
+                                            <ShieldCheck size={32} />
+                                            <p className="text-[11px] font-black uppercase tracking-widest">No Critical Alerts</p>
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-y-auto h-full custom-scrollbar">
+                                            <table className="w-full text-left border-separate border-spacing-y-2">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2">Timestamp</th>
+                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2">Incident</th>
+                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-center">SOC/SOH</th>
+                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-center">Spd/Vlt</th>
+                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-right">SMS</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
+                                                </thead>
+                                                <tbody>
+                                                    {alertHistory.map(alert => (
+                                                        <tr key={alert._id} className="group">
+                                                            <td className="bg-white/5 border-l border-y border-white/10 rounded-l-xl px-2 py-3 text-[9px] font-mono font-bold text-white/80 group-hover:bg-white/10 transition-colors">
+                                                                {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </td>
+                                                            <td className="bg-white/5 border-y border-white/10 px-2 py-3 group-hover:bg-white/10 transition-colors">
+                                                                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-[#FF4D4D]/10 text-[#FF4D4D] border border-[#FF4D4D]/20 block w-fit">
+                                                                    {alert.action === 'EMERGENCY_TRIGGER' ? 'MANUAL' : alert.action.split(' ')[0]}
+                                                                </span>
+                                                            </td>
+                                                            <td className="bg-white/5 border-y border-white/10 px-2 py-3 text-center group-hover:bg-white/10 transition-colors">
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-[10px] font-black text-white">{alert.batterySOC ?? 0}%</span>
+                                                                    <span className="text-[7px] font-bold text-white/40 uppercase">H:{alert.batterySOH ?? 100}%</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="bg-white/5 border-y border-white/10 px-2 py-3 text-center group-hover:bg-white/10 transition-colors">
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-[10px] font-black text-white">{alert.speed ?? 0}</span>
+                                                                    <span className="text-[7px] font-bold text-white/40 uppercase">{alert.batteryVoltage ?? 0}V</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="bg-white/5 border-r border-y border-white/10 rounded-r-xl px-2 py-3 text-[9px] font-black text-right group-hover:bg-white/10 transition-colors">
+                                                                <span className={alert.smsStatus === 'Sent' ? 'text-emerald-400' : 'text-rose-400'}>
+                                                                    {alert.smsStatus === 'Sent' ? 'SENT' : 'FAIL'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </>
+                    </>
+                </div>
             )}
         </div>
     );

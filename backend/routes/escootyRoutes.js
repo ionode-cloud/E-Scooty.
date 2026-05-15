@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const escootyController = require('../controllers/escootyController');
 const { protect, admin } = require('../middleware/authMiddleware');
+const { validateIndianPhone } = require('../middleware/validationMiddleware');
 
 const dataController = require('../controllers/dataController');
 
@@ -11,7 +12,7 @@ const dataController = require('../controllers/dataController');
 router.route('/')
     .get(dataController.getTelemetry)               // GET    /api/escooty?deviceId=...
     .post(dataController.syncCoreData)              // POST   /api/escooty  (create new record)
-    .put(dataController.syncCoreData)               // PUT    /api/escooty  (create new record - aligned with user request)
+    .put(dataController.syncCoreData)               // PUT    /api/escooty  (create new record)
     .delete(dataController.deleteTelemetry);        // DELETE /api/escooty?deviceId=... (purge device logs)
 
 // Path-based telemetry purge (easier for Postman)
@@ -21,7 +22,9 @@ router.delete('/history/:deviceId', dataController.deleteTelemetry);
 router.delete('/record/:id', dataController.deleteTelemetryRecord);
 
 router.route('/register')
-    .post(escootyController.createDashboard); // POST /api/escooty/register
+    .post(validateIndianPhone, escootyController.createDashboard); // POST /api/escooty/register
+
+router.post('/emergency', dataController.triggerManualEmergency); // POST /api/escooty/emergency
 
 // Delete dashboard by deviceId (hardware signature)
 router.route('/node/:deviceId')

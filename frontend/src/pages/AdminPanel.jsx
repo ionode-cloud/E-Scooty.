@@ -17,7 +17,10 @@ const AdminPanel = () => {
     const fetchUsers = async () => {
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
-            const res = await axios.get(`${apiUrl}/api/users`);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${apiUrl}/api/users`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setUsers(res.data);
         } catch (error) { console.error('Error fetching users', error); }
     };

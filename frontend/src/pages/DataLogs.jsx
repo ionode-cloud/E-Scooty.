@@ -25,7 +25,10 @@ const DataLogs = () => {
         const fetchDashboards = async () => {
             try {
                 const apiUrl = import.meta.env.VITE_API_URL ;
-                const res = await axios.get(`${apiUrl}/api/dashboards`);
+                const token = localStorage.getItem('token');
+                const res = await axios.get(`${apiUrl}/api/dashboards`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 setDashboards(res.data);
                 if (res.data.length > 0) setSelectedDeviceId(res.data[0].deviceId);
             } catch (error) {
@@ -44,8 +47,14 @@ const DataLogs = () => {
         socket.on('device-data', (data) => {
             if (data.deviceId === selectedDeviceId) {
                 setDeviceData(prev => {
-                    const exists = prev.some(d => d._id === data._id || d.timestamp === data.timestamp);
-                    if (exists) return prev;
+                    const index = prev.findIndex(d => d._id === data._id);
+                    if (index !== -1) {
+                        // Update existing row in place
+                        const updated = [...prev];
+                        updated[index] = data;
+                        return updated;
+                    }
+                    // Add new row to the top
                     return [data, ...prev].slice(0, 200);
                 });
             }
@@ -57,7 +66,10 @@ const DataLogs = () => {
                 const url = `${apiUrl}/api/vehicle/history?deviceId=${selectedDeviceId}&limit=100` +
                             (startDate ? `&startDate=${startDate}` : '') +
                             (endDate ? `&endDate=${endDate}` : '');
-                const res = await axios.get(url);
+                const token = localStorage.getItem('token');
+                const res = await axios.get(url, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 setDeviceData(res.data);
             } catch (error) {
                 console.error('Error fetching history', error);
@@ -83,12 +95,18 @@ const DataLogs = () => {
         setUploading(true);
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
+            const token = localStorage.getItem('token');
             await axios.post(`${apiUrl}/api/upload-xlsx`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}`
+                }
             });
             alert('Data uploaded successfully!');
             // Refresh data
-            const res = await axios.get(`${apiUrl}/api/vehicle/history?deviceId=${selectedDeviceId}&limit=100`);
+            const res = await axios.get(`${apiUrl}/api/vehicle/history?deviceId=${selectedDeviceId}&limit=100`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setDeviceData(res.data);
         } catch (error) {
             console.error('Upload failed', error);
@@ -127,8 +145,12 @@ const DataLogs = () => {
     const handleDownload = async () => {
         try {
             const apiUrl = import.meta.env.VITE_API_URL ;
+            const token = localStorage.getItem('token');
             const url = `${apiUrl}/api/download?deviceId=${selectedDeviceId}&startDate=${startDate}&endDate=${endDate}`;
-            const response = await axios.get(url, { responseType: 'blob' });
+            const response = await axios.get(url, { 
+                responseType: 'blob',
+                headers: { Authorization: `Bearer ${token}` }
+            });
             const link = document.createElement('a');
             link.href = window.URL.createObjectURL(new Blob([response.data]));
             link.setAttribute('download', `EV_Log_${selectedDeviceId}_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -261,6 +283,7 @@ const DataLogs = () => {
                             <tr>
                                 <th className="text-[#064E3B]">Timestamp</th>
                                 <th className="text-[#064E3B]">SOC</th>
+                                <th className="text-[#064E3B]">B-Temp</th>
                                 <th className="text-[#064E3B]">SOH</th>
                                 <th className="text-[#064E3B]">Voltage</th>
                                 <th className="text-[#064E3B]">Speed</th>
@@ -271,9 +294,9 @@ const DataLogs = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={7} className="py-24 text-center"><div className="btn-spinner border-emerald-100 border-t-[#10B981] mx-auto w-10 h-10 border-4"></div></td></tr>
+                                <tr><td colSpan={9} className="py-24 text-center"><div className="btn-spinner border-emerald-100 border-t-[#10B981] mx-auto w-10 h-10 border-4"></div></td></tr>
                             ) : deviceData.length === 0 ? (
-                                <tr><td colSpan={7} className="py-24 text-center text-[#94A3B8] font-bold uppercase tracking-widest text-xs">Awaiting node telemetry synchronization...</td></tr>
+                                <tr><td colSpan={9} className="py-24 text-center text-[#94A3B8] font-bold uppercase tracking-widest text-xs">Awaiting node telemetry synchronization...</td></tr>
                             ) : (
                                 deviceData.map((d, index) => (
                                     <tr key={index} className="hover:bg-emerald-50/30 transition-colors">
@@ -285,6 +308,15 @@ const DataLogs = () => {
                                                 </div>
                                                 <span className="text-[#064E3B] font-black text-[11px]">{d.batterySOC}%</span>
                                             </div>
+                                        </td>
+                                        <td>
+                                            <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
+                                                d.batteryTemperature > 55 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                                d.batteryTemperature > 40 ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+                                                'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                            }`}>
+                                                {d.batteryTemperature}°C
+                                            </span>
                                         </td>
                                         <td>
                                             <span className="text-xs font-bold text-[#064E3B]">{d.batterySOH ?? 100}%</span>

@@ -3,13 +3,14 @@ const Device = require('../models/Device');
 const crypto = require('crypto');
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
+const { triggerEmergencyAlerts } = require('../utils/smsService');
 
 // Auto-generate a unique particle-style ID
 const generateParticleId = () => crypto.randomBytes(12).toString('hex');
 
 exports.createDashboard = async (req, res) => {
     try {
-        const { dashboardName, deviceId, email, password, enabledFeatures, description } = req.body;
+        const { dashboardName, deviceId, email, password, enabledFeatures, description, emergencyContacts } = req.body;
 
         if (!dashboardName || !deviceId || !email || !password) {
             return res.status(400).json({ message: 'Dashboard name, Device ID, Email, and Password are required.' });
@@ -69,10 +70,24 @@ exports.createDashboard = async (req, res) => {
             deviceId,
             enabledFeatures: enabledFeatures || ['batterySOC', 'batteryVoltage', 'batteryTemperature', 'motorTemperature', 'motorRPM', 'wheelRPM', 'loss', 'torque', 'gps'],
             description: description || '',
+            emergencyContacts: emergencyContacts || [],
             user: user._id
         });
 
         await dashboard.save();
+
+        // Send Welcome SMS to Emergency Contacts
+        if (emergencyContacts && emergencyContacts.length > 0) {
+            await triggerEmergencyAlerts(emergencyContacts, {
+                alertType: 'Registration Confirmation',
+                scooterName: dashboardName,
+                temperature: 'N/A',
+                time: new Date().toLocaleString(),
+                latitude: null,
+                longitude: null
+            });
+        }
+
         res.status(201).json({ message: 'Dashboard created successfully', dashboard, user: { email: user.email, _id: user._id } });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -106,6 +121,7 @@ exports.getDashboards = async (req, res) => {
 
         res.status(200).json(enrichedDashboards);
     } catch (error) {
+        console.error('Error in getDashboards:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

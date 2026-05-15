@@ -1,5 +1,6 @@
 const Dashboard = require('../models/Dashboard');
 const Device = require('../models/Device');
+const { triggerEmergencyAlerts } = require('../utils/smsService');
 
 // =============================
 // DASHBOARD CONTROLLERS
@@ -24,6 +25,19 @@ exports.createDashboard = async (req, res) => {
 
         const newDashboard = new Dashboard(req.body);
         await newDashboard.save();
+
+        // Send Welcome SMS to Emergency Contacts
+        if (newDashboard.emergencyContacts && newDashboard.emergencyContacts.length > 0) {
+            await triggerEmergencyAlerts(newDashboard.emergencyContacts, {
+                alertType: 'Registration Confirmation',
+                scooterName: newDashboard.dashboardName,
+                temperature: 'N/A',
+                time: new Date().toLocaleString(),
+                latitude: null,
+                longitude: null
+            });
+        }
+
         res.status(201).json(newDashboard);
     } catch (error) {
         res.status(500).json({ message: 'Error creating dashboard', error: error.message });

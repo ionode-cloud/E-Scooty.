@@ -1,6 +1,22 @@
 const DeviceData = require('../models/DeviceData');
 const Device = require('../models/Device');
+const Dashboard = require('../models/Dashboard');
+const AlertHistory = require('../models/AlertHistory');
 const ExcelJS = require('exceljs');
+const mongoose = require('mongoose');
+const { triggerEmergencyAlerts } = require('../utils/smsService');
+
+// Temperature Thresholds
+const TEMP_THRESHOLDS = {
+    NORMAL_MAX: 40,
+    WARNING_MAX: 55
+};
+
+const getWarningLevel = (temp) => {
+    if (temp <= TEMP_THRESHOLDS.NORMAL_MAX) return 'Normal';
+    if (temp <= TEMP_THRESHOLDS.WARNING_MAX) return 'Warning';
+    return 'Danger';
+};
 
 // ESP32 sends data here
 exports.receiveData = async (req, res) => {
@@ -38,6 +54,8 @@ exports.receiveData = async (req, res) => {
         // Normalize accident flag
         const accidentFlag = accidentDetected === true || accidentDetected === 1 || accidentDetected === '1';
 
+        const warningLevel = getWarningLevel(batteryTemp);
+
         const newData = new DeviceData({
             deviceId,
             batteryTemperature: batteryTemp,
@@ -45,6 +63,7 @@ exports.receiveData = async (req, res) => {
             batterySOH: batterySOH ?? null,
             batteryVoltage,
             motorTemperature: motorTemp,
+            warningLevel,
             motorRPM,
             wheelRPM,
             loss,
@@ -68,11 +87,37 @@ exports.receiveData = async (req, res) => {
         // Emit real-time update via Socket.io
         req.io.emit('device-data', newData);
 
+        // Fetch dashboard for emergency contacts
+        const dashboard = await Dashboard.findOne({ deviceId });
+
+        // Trigger SMS for Temperature Danger
+        if (warningLevel === 'Danger' && dashboard) {
+            await triggerEmergencyAlerts(dashboard.emergencyContacts, {
+                alertType: 'Battery Overheat',
+                scooterName: dashboard.dashboardName || deviceId,
+                temperature: batteryTemp,
+                time: new Date().toLocaleString(),
+                latitude,
+                longitude
+            });
+        }
+
         // Emit accident alert if detected
         if (accidentFlag) {
             const mapsLink = (latitude && longitude)
                 ? `https://www.google.com/maps?q=${latitude},${longitude}`
                 : null;
+            
+            if (dashboard) {
+                await triggerEmergencyAlerts(dashboard.emergencyContacts, {
+                    alertType: 'Accident Detected',
+                    scooterName: dashboard.dashboardName || deviceId,
+                    temperature: batteryTemp,
+                    time: new Date().toLocaleString(),
+                    latitude,
+                    longitude
+                });
+            }
             req.io.emit('accident-alert', {
                 deviceId,
                 deviceName: device.deviceName || deviceId,
@@ -162,7 +207,7 @@ exports.downloadExcel = async (req, res) => {
 };
 
 // Fields returned by the simplified /api/escooty endpoints
-const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage speed brakeStatus gpsLatitude gpsLongitude action timestamp';
+const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage batteryTemperature speed brakeStatus gpsLatitude gpsLongitude action timestamp';
 
 // Helper: pick only the core fields from a Mongoose document
 const pickCoreFields = (doc) => ({
@@ -171,6 +216,7 @@ const pickCoreFields = (doc) => ({
     batterySOC:         doc.batterySOC,
     batterySOH:         doc.batterySOH,
     batteryVoltage:     doc.batteryVoltage,
+    batteryTemperature: doc.batteryTemperature,
     speed:              doc.speed,
     brakeStatus:        doc.brakeStatus,
     gpsLatitude:        doc.gpsLatitude,
@@ -199,12 +245,17 @@ exports.syncCoreData = async (req, res) => {
         const mappedBrakeStatus = (brakeStatus === 1 || brakeStatus === '1' || brakeStatus === 'APPLIED') ? 'APPLIED' : 'RELEASED';
         const emergencyBrakeTimestamp = (mappedBrakeStatus === 'APPLIED') ? new Date() : null;
 
+        const batteryTemp = Number(req.body.batteryTemperature || req.body.batteryTemp || 0);
+        const warningLevel = getWarningLevel(batteryTemp);
+
         const newData = new DeviceData({
             deviceId,
             timestamp: timestamp ? new Date(timestamp) : new Date(),
             batterySOC:     Number(batterySOC || 0),
             batterySOH:     Number(batterySOH || 0),
             batteryVoltage: Number(batteryVoltage || 0),
+            batteryTemperature: batteryTemp,
+            warningLevel,
             speed:          Number(speed || Speed || 0),
             brakeStatus:    mappedBrakeStatus,
             emergencyBrakeTimestamp,
@@ -216,6 +267,56 @@ exports.syncCoreData = async (req, res) => {
         await newData.save();
         req.io.emit('device-data', newData);
 
+        // PRODUCTION EMERGENCY WORKFLOW
+        const dashboard = await Dashboard.findOne({ deviceId });
+        
+        // Normalize action for comparison
+        const normalizedAction = (action || '').trim();
+        const emergencyActions = ['Accident Detected', 'Accident Detect', 'Battery Overheat', 'SOS Help', 'Theft Alert', 'Vehicle Theft'];
+        
+        const isValidEmergencyAction = normalizedAction !== '' && emergencyActions.includes(normalizedAction);
+        
+        if (dashboard && isValidEmergencyAction) {
+            const currentAction = normalizedAction;
+            
+            // 1. Create Alert History Record
+            const alert = new AlertHistory({
+                deviceId,
+                action: currentAction,
+                batteryTemperature: batteryTemp,
+                batterySOC: newData.batterySOC,
+                batterySOH: newData.batterySOH,
+                batteryVoltage: newData.batteryVoltage,
+                gpsLatitude: newData.gpsLatitude,
+                gpsLongitude: newData.gpsLongitude,
+                speed: newData.speed,
+                brakeStatus: newData.brakeStatus,
+                mapLink: `https://maps.google.com/?q=${newData.gpsLatitude},${newData.gpsLongitude}`,
+                recipients: dashboard.emergencyContacts
+            });
+
+            // 2. Trigger Realtime SMS Distribution
+            const smsResult = await triggerEmergencyAlerts(dashboard.emergencyContacts, {
+                action: currentAction,
+                deviceId,
+                batteryTemperature: batteryTemp,
+                speed: newData.speed,
+                brakeStatus: newData.brakeStatus,
+                gpsLatitude: newData.gpsLatitude,
+                gpsLongitude: newData.gpsLongitude
+            });
+
+            alert.smsStatus = smsResult.status;
+            await alert.save();
+
+            // 3. Emit Socket.io Siren Event
+            req.io.emit('emergency-alert', {
+                ...alert.toObject(),
+                siren: true,
+                message: smsResult.message
+            });
+        }
+
         res.status(201).json({ 
             success: true, 
             message: 'Core telemetry synchronized', 
@@ -223,6 +324,28 @@ exports.syncCoreData = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Kernel sync error', error: error.message });
+    }
+};
+
+// GET /api/alerts/:deviceId
+exports.getAlertHistory = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const alerts = await AlertHistory.find({ deviceId }).sort({ createdAt: -1 }).limit(50);
+        res.status(200).json(alerts);
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Kernel alert fetch error', error: error.message });
+    }
+};
+
+// DELETE /api/alerts/:deviceId — purge alert history
+exports.deleteAlertHistory = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        await AlertHistory.deleteMany({ deviceId });
+        res.status(200).json({ success: true, message: 'Alert history purged successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Alert purge failure', error: error.message });
     }
 };
 
@@ -272,12 +395,17 @@ exports.upsertTelemetry = async (req, res) => {
         const mappedBrakeStatus = (brakeStatus === 1 || brakeStatus === '1' || brakeStatus === 'APPLIED') ? 'APPLIED' : 'RELEASED';
         const emergencyBrakeTimestamp = (mappedBrakeStatus === 'APPLIED') ? new Date() : null;
 
+        const batteryTemp = Number(req.body.batteryTemperature || req.body.batteryTemp || 0);
+        const warningLevel = getWarningLevel(batteryTemp);
+
         const payload = {
             deviceId,
             timestamp: timestamp ? new Date(timestamp) : new Date(),
             batterySOC:     Number(batterySOC || 0),
             batterySOH:     Number(batterySOH || 0),
             batteryVoltage: Number(batteryVoltage || 0),
+            batteryTemperature: batteryTemp,
+            warningLevel,
             speed:          Number(speed || Speed || 0),
             brakeStatus:    mappedBrakeStatus,
             emergencyBrakeTimestamp,
@@ -294,6 +422,23 @@ exports.upsertTelemetry = async (req, res) => {
         );
 
         req.io.emit('device-data', upserted);
+
+        // Trigger SMS ONLY if action is critical.
+        const dashboard = await Dashboard.findOne({ deviceId });
+        const normalizedAction = (action || '').trim();
+        const emergencyActions = ['Battery Overheat', 'Accident Detected', 'Accident Detect', 'Vehicle Theft', 'Theft Alert', 'SOS Help'];
+        const isValidEmergencyAction = normalizedAction !== '' && emergencyActions.includes(normalizedAction);
+        
+        if (dashboard && isValidEmergencyAction) {
+            await triggerEmergencyAlerts(dashboard.emergencyContacts, {
+                alertType: normalizedAction,
+                scooterName: dashboard.dashboardName || deviceId,
+                temperature: batteryTemp,
+                time: new Date().toLocaleString(),
+                latitude: upserted.gpsLatitude,
+                longitude: upserted.gpsLongitude
+            });
+        }
 
         res.status(200).json({
             success: true,
@@ -431,5 +576,80 @@ exports.uploadExcel = async (req, res) => {
         console.error('Upload Error:', error);
         if (req.file) fs.unlinkSync(req.file.path);
         res.status(500).json({ message: 'Error processing excel file', error: error.message });
+    }
+};
+
+// Trigger manual emergency alert from dashboard
+exports.triggerManualEmergency = async (req, res) => {
+    try {
+        const { deviceId, alertType } = req.body;
+        if (!deviceId || !alertType) {
+            return res.status(400).json({ message: 'deviceId and alertType are required' });
+        }
+
+        const dashboard = await Dashboard.findOne({ deviceId });
+        if (!dashboard) {
+            return res.status(404).json({ message: 'Dashboard not found' });
+        }
+
+        // Get latest telemetry for temperature and location
+        const latestData = await DeviceData.findOne({ deviceId }).sort({ timestamp: -1 });
+
+        await triggerEmergencyAlerts(dashboard.emergencyContacts, {
+            alertType,
+            scooterName: dashboard.dashboardName || deviceId,
+            temperature: latestData ? latestData.batteryTemperature : 'N/A',
+            time: new Date().toLocaleString(),
+            latitude: latestData ? latestData.gpsLatitude : null,
+            longitude: latestData ? latestData.gpsLongitude : null
+        });
+
+        // Log the emergency event with latest telemetry context to avoid "zeroing" the dashboard
+        let telemetryContext = {};
+        if (latestData) {
+            telemetryContext = latestData.toObject();
+            delete telemetryContext._id;
+            delete telemetryContext.__v;
+            delete telemetryContext.createdAt;
+            delete telemetryContext.updatedAt;
+        }
+
+        const emergencyLog = new DeviceData({
+            ...telemetryContext,
+            deviceId,
+            action: 'EMERGENCY_TRIGGER',
+            accidentDetected: alertType === 'Accident Detected',
+            timestamp: new Date()
+        });
+        await emergencyLog.save();
+
+        // Log to AlertHistory as well so it appears in the dashboard history list
+        const alertRecord = new AlertHistory({
+            deviceId,
+            action: alertType,
+            batteryTemperature: emergencyLog.batteryTemperature,
+            batterySOC: emergencyLog.batterySOC,
+            batterySOH: emergencyLog.batterySOH,
+            batteryVoltage: emergencyLog.batteryVoltage,
+            gpsLatitude: emergencyLog.gpsLatitude,
+            gpsLongitude: emergencyLog.gpsLongitude,
+            speed: emergencyLog.speed,
+            brakeStatus: emergencyLog.brakeStatus,
+            mapLink: `https://maps.google.com/?q=${emergencyLog.gpsLatitude},${emergencyLog.gpsLongitude}`,
+            recipients: dashboard.emergencyContacts,
+            smsStatus: 'Sent' // Manual triggers assume immediate broadcast
+        });
+        await alertRecord.save();
+
+        req.io.emit('device-data', emergencyLog);
+        req.io.emit('emergency-alert', {
+            ...alertRecord.toObject(),
+            siren: true,
+            message: `Manual ${alertType} triggered`
+        });
+
+        res.status(200).json({ success: true, message: `Emergency alert "${alertType}" sent to contacts.` });
+    } catch (error) {
+        res.status(500).json({ message: 'Error triggering emergency', error: error.message });
     }
 };

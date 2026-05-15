@@ -14,6 +14,11 @@ const deviceDataSchema = new mongoose.Schema({
     motorTemperature: {
         type: Number,
     },
+    warningLevel: {
+        type: String,
+        enum: ['Normal', 'Warning', 'Danger'],
+        default: 'Normal',
+    },
     batterySOC: {
         type: Number,
     },

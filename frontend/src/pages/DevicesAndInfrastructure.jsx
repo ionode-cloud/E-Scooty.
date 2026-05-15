@@ -10,13 +10,17 @@ const DevicesAndInfrastructure = () => {
     const [selectedDevice, setSelectedDevice] = useState('');
     const [deviceStatus, setDeviceStatus] = useState(null);
     const [isLoading, setIsLoading] = useState({ check: false, link: false, upload: false });
+    const [dragActive, setDragActive] = useState(false);
 
     useEffect(() => { fetchDevices(); }, []);
 
     const fetchDevices = async () => {
         try {
             const apiUrl = import.meta.env.VITE_API_URL ;
-            const res = await axios.get(`${apiUrl}/api/devices`);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${apiUrl}/api/devices`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setDevices(res.data);
         } catch (error) { console.error('Error fetching devices', error); }
     };
@@ -27,7 +31,10 @@ const DevicesAndInfrastructure = () => {
         setUploadStatus('QUERYING_HARDWARE_NODE...');
         try {
             const apiUrl = import.meta.env.VITE_API_URL ;
-            const res = await axios.get(`${apiUrl}/api/ota/check-device?device=${selectedDevice}`);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${apiUrl}/api/ota/check-device?device=${selectedDevice}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setDeviceStatus(res.data.online);
             setUploadStatus(res.data.online ? '✓ SYSTEM_STATUS: ONLINE' : '⚠ SYSTEM_STATUS: OFFLINE');
         } catch (error) {
@@ -44,7 +51,10 @@ const DevicesAndInfrastructure = () => {
         setUploadStatus('INITIALIZING_REMOTE_FLASH...');
         try {
             const apiUrl = import.meta.env.VITE_API_URL ;
-            const res = await axios.post(`${apiUrl}/api/ota/update-link/${selectedDevice}`, { url: gitLink });
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${apiUrl}/api/ota/update-link/${selectedDevice}`, { url: gitLink }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setUploadStatus(`✓ ${res.data}`);
             setGitLink('');
         } catch (error) {
@@ -60,18 +70,47 @@ const DevicesAndInfrastructure = () => {
         const formData = new FormData();
         formData.append('firmware', file);
         setIsLoading(prev => ({ ...prev, upload: true }));
-        setUploadStatus('TRANSMITTING_BINARY_PAYLOAD...');
+        setUploadStatus('uploading.......');
         try {
             const apiUrl = import.meta.env.VITE_API_URL ;
+            const token = localStorage.getItem('token');
             const res = await axios.post(`${apiUrl}/api/ota/upload/${selectedDevice}`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}`
+                }
             });
             setUploadStatus(`✓ ${res.data}`);
+            alert(`Firmware uploaded for ${selectedDevice}`);
             setFile(null);
         } catch (error) {
             setUploadStatus(error.response?.data?.message || 'UPLINK_FAILURE');
         } finally {
             setIsLoading(prev => ({ ...prev, upload: false }));
+        }
+    };
+
+    const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const droppedFile = e.dataTransfer.files[0];
+            if (droppedFile.name.endsWith('.bin')) {
+                setFile(droppedFile);
+            } else {
+                alert("Please drop only .bin files.");
+            }
         }
     };
 
@@ -166,16 +205,22 @@ const DevicesAndInfrastructure = () => {
                                 <HardDrive size={14} className="text-[#346eea]" />
                                 <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">Direct Binary Uplink (.bin)</label>
                             </div>
-                            <div className="group relative border-2 border-dashed border-[#E5E7EB] rounded-2xl p-8 hover:border-[#346eea] hover:bg-[#FFF7ED]/30 transition-all cursor-pointer text-center bg-[#F8FAFC]">
+                            <div 
+                                className={`group relative border-2 border-dashed rounded-2xl p-8 hover:border-[#346eea] hover:bg-[#FFF7ED]/30 transition-all cursor-pointer text-center ${dragActive ? 'border-[#346eea] bg-[#FFF7ED]/50 scale-[1.02]' : 'border-[#E5E7EB] bg-[#F8FAFC]'}`}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                            >
                                 <input
                                     type="file" accept=".bin"
                                     onChange={e => setFile(e.target.files[0])}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                 />
-                                <Upload className="mx-auto mb-3 text-[#94A3B8] group-hover:text-[#346eea] group-hover:scale-110 transition-all" size={32} />
+                                <Upload className={`mx-auto mb-3 transition-all ${dragActive ? 'text-[#346eea] scale-110' : 'text-[#94A3B8] group-hover:text-[#346eea] group-hover:scale-110'}`} size={32} />
                                 <p className="text-sm font-bold text-[#111827]">Drop Firmware Binary</p>
                                 <p className="text-[10px] text-[#94A3B8] uppercase tracking-widest mt-1">Accepts raw .bin files up to 4MB</p>
-                                {file && <div className="mt-4 px-3 py-1 bg-white border border-[#346eea]/30 rounded-lg text-xs font-bold text-[#346eea] inline-flex items-center gap-2">📎 {file.name}</div>}
+                                {file && <div className="mt-4 px-3 py-1 bg-white border border-[#346eea]/30 rounded-lg text-xs font-bold text-[#346eea] inline-flex items-center gap-2 animate-in zoom-in">📎 {file.name}</div>}
                             </div>
                             <button
                                 onClick={handleUploadFirmware}
@@ -195,8 +240,12 @@ const DevicesAndInfrastructure = () => {
 
                     {/* Console Report */}
                     {uploadStatus && (
-                        <div className="p-4 bg-[#111827] text-[#059669] rounded-xl font-mono text-[11px] leading-6 border border-white/5 shadow-inner">
-                            <span className="text-[#94A3B8] mr-2">LOG:</span> {uploadStatus}
+                        <div className="p-4 bg-[#111827] text-[#059669] rounded-xl font-mono text-[11px] leading-6 border border-white/5 shadow-inner flex items-center">
+                            <span className="text-[#94A3B8] mr-2">LOG:</span> 
+                            {uploadStatus}
+                            {uploadStatus === 'uploading.......' && (
+                                <div className="ml-3 w-3 h-3 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin"></div>
+                            )}
                         </div>
                     )}
                 </div>

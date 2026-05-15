@@ -119,10 +119,22 @@
   gap: 24px;
 }
 
+@keyframes siren-flash {
+    0%, 100% { background-color: rgba(220, 38, 38, 0); }
+    50% { background-color: rgba(220, 38, 38, 0.4); }
+}
+
+.animate-siren {
+    animation: siren-flash 0.8s infinite;
+}
+
 @media (min-width: 1024px) {
   .modern-grid-container {
     grid-template-columns: 400px 1fr;
   }
+    .modern-small-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
 
 .modern-small-grid {
@@ -132,6 +144,7 @@
 }
 
 .modern-kpi {
+  background-color: rgb(212, 64, 64);
   border-radius: 28px;
   padding: 24px;
   color: white;

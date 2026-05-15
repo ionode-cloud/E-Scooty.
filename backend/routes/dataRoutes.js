@@ -8,8 +8,10 @@ const upload = multer({ dest: 'uploads/' });
 
 router.post('/device-data', dataController.receiveData); // Open API for ESP32
 router.post('/sync-core', dataController.syncCoreData); // Optimized E-Scooty Dashboard API
-router.get('/history/:deviceId', dataController.getHistory); // Used by dashboard charts
-router.get('/emergency-logs/:deviceId', dataController.getEmergencyLogs); // For Timestamp Log card
+router.get('/history/:deviceId', dataController.getHistory); 
+router.get('/emergency-logs/:deviceId', dataController.getEmergencyLogs); 
+router.get('/alerts/:deviceId', dataController.getAlertHistory); 
+router.delete('/alerts/:deviceId', protect, dataController.deleteAlertHistory); 
 router.put('/record/:id', protect, admin, dataController.updateData);
 router.delete('/record/:id', protect, admin, dataController.deleteData);
 router.delete('/history/:deviceId', protect, admin, dataController.clearHistory);
