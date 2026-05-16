@@ -504,30 +504,63 @@ const Dashboard = () => {
                                             {latestData?.warningLevel || 'Normal State'}
                                         </p>
                                     </div>
-                                    <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                        <Thermometer size={80} />
-                                    </div>
                                 </div>
 
-                                {/* Accident Trigger Card */}
-                                <button
-                                    onClick={() => handleManualEmergency('Accident Detected')}
-                                    className="modern-kpi bg-rose-500/10 border border-rose-500/20 hover:bg-rose-600 transition-all group text-left"
-                                >
-                                    <div className="modern-icon-box bg-rose-500 text-white group-hover:bg-white group-hover:text-rose-600 transition-colors">
-                                        <Siren size={20} />
-                                    </div>
-                                    <div className="mt-auto">
-                                        <p className="modern-value text-rose-600 text-white transition-colors">TRIGGER</p>
-                                        <p className="modern-label mt-1 text-rose-600/80 text-white/80">Accident Alert</p>
-                                        <p className="modern-sub-value mt-0.5 text-rose-600/80text-white/40">Manual SMS Sync</p>
-                                    </div>
-                                </button>
+                                {/* Animated Scooty Card */}
+                                {(() => {
+                                    const isAlerting = selectedDashboard && activeEmergencyDeviceIds.includes(selectedDashboard.deviceId);
+                                    return (
+                                        <div className={`modern-kpi border relative overflow-hidden group flex items-center justify-center p-0 transition-all duration-500 ${isAlerting ? 'bg-rose-600/20 border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.2)]' : 'grad-dark border-white/5'}`}>
+                                            <div className={`absolute inset-0 bg-gradient-to-br transition-opacity duration-500 ${isAlerting ? 'from-rose-500/20 to-transparent opacity-100' : 'from-emerald-500/10 to-transparent opacity-50'}`}></div>
+                                            <div className="relative z-10 flex flex-col items-center justify-center w-full h-full text-center p-6">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border transition-all duration-500 ${isAlerting ? 'bg-rose-500/20 border-rose-500/40 text-rose-500 animate-pulse' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                                                        {isAlerting ? <AlertTriangle size={24} /> : <ShieldCheck size={24} />}
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${isAlerting ? 'text-rose-400' : 'text-white/40'}`}>System Status</p>
+                                                        <p className={`text-xl font-black uppercase tracking-tight mt-0.5 ${isAlerting ? 'text-rose-500 animate-pulse' : 'text-emerald-400'}`}>
+                                                            {isAlerting ? 'CRITICAL INCIDENT' : 'SECURE & ACTIVE'}
+                                                        </p>
+                                                        <p className={`text-[9px] font-bold uppercase tracking-widest mt-1 opacity-60 ${isAlerting ? 'text-rose-400' : 'text-emerald-500'}`}>
+                                                            {isAlerting ? 'Emergency Protocols Engaged' : 'Operational Stream Online'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <style>{`
+                                                @keyframes roadMove {
+                                                    from { stroke-dashoffset: 20; }
+                                                    to { stroke-dashoffset: 0; }
+                                                }
+                                                .animate-road {
+                                                    animation: roadMove 0.5s linear infinite;
+                                                }
+                                                @keyframes scootyBounce {
+                                                    0%, 100% { transform: translateY(0); }
+                                                    50% { transform: translateY(-2px); }
+                                                }
+                                                .animate-scooty-bounce {
+                                                    animation: scootyBounce 0.3s ease-in-out infinite;
+                                                }
+                                                @keyframes wheelSpin {
+                                                    from { transform: rotate(0deg); }
+                                                    to { transform: rotate(360deg); }
+                                                }
+                                                .animate-wheel-spin {
+                                                    animation: wheelSpin 0.4s linear infinite;
+                                                    transform-box: fill-box;
+                                                    transform-origin: center;
+                                                }
+                                            `}</style>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
 
-
                         <div className="space-y-4">
+
                             <h2 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em] ml-1">Live Activity Stream</h2>
                             <div className="modern-chart-card w-full">
                                 <div className="flex justify-between items-start mb-8">
