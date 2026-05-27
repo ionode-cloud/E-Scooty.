@@ -26,16 +26,50 @@ This document outlines the core API endpoints for synchronizing telemetry data b
   "batterySOH": 98.2,
   "batteryVoltage": 48.2,
   "batteryTemperature": 32,
+  "motorTemperature": 45.0,
+  "motorRPM": 1200,
   "speed": 25.4,
   "brakeStatus": "RELEASED",
   "gpsLatitude": 20.2961,
   "gpsLongitude": 85.8245,
+  "ignitionStatus": "ON",
   "action": "TELEMETRY_SYNC"
 }
 ```
 
+**New Fields:**
+| Field | Type | Values | Description |
+|---|---|---|---|
+| `motorTemperature` | Number | e.g. `45.0` | Motor temperature in °C |
+| `motorRPM` | Number | e.g. `1200` | Motor revolutions per minute |
+| `ignitionStatus` | String | `"ON"` / `"OFF"` | Current ignition state |
+
 ### `PUT /api/escooty` — Update Telemetry
 **Description:** Upserts the latest telemetry record for the device.
+
+---
+
+## 1b. Ignition Control — `/api/escooty/ignition`
+
+### `POST /api/escooty/ignition` — Set Ignition State
+**Description:** Remotely set the ignition switch ON or OFF for a device. Emits a real-time socket event to all connected clients.
+**Body (JSON):**
+```json
+{
+  "deviceId": "ES101",
+  "ignitionStatus": "ON"
+}
+```
+*Valid values for `ignitionStatus`:* `"ON"`, `"OFF"`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Ignition set to ON for device ES101",
+  "ignitionStatus": "ON"
+}
+```
 
 ---
 
@@ -71,6 +105,48 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 ### 3.2 Delete Dashboard (by Device ID)
 **Endpoint:** `DELETE /api/escooty/node/:deviceId`  
 **Description:** Removes dashboard and purges all telemetry history.
+
+### 3.3 Full Dashboard CRUD API — `/api/escooty/dashboard`
+**Description:** Direct dashboard CRUD operations.
+
+#### `GET /api/escooty/dashboard` — Get All Dashboards
+- **Response (JSON Array):**
+  ```json
+  [
+    {
+      "_id": "60d5ec4b868e821f584f2e5a",
+      "dashboardName": "E-Scooty ES101",
+      "deviceId": "ES101",
+      "particleId": "7a3592bc13d5089f2a24ec6f",
+      "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
+      "description": "Premium Fleet Unit",
+      "emergencyContacts": ["+919876543210"]
+    }
+  ]
+  ```
+
+#### `POST /api/escooty/dashboard` — Create Dashboard
+- **Body (JSON):**
+  ```json
+  {
+    "dashboardName": "E-Scooty ES101",
+    "deviceId": "ES101",
+    "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
+    "description": "Premium Fleet Unit",
+    "emergencyContacts": ["+919876543210"]
+  }
+  ```
+
+#### `PUT /api/escooty/dashboard/:id` — Update Dashboard
+- **Body (JSON):**
+  ```json
+  {
+    "dashboardName": "Updated E-Scooty ES101",
+    "enabledFeatures": ["batterySOC", "batteryVoltage", "gps", "batteryTemperature"]
+  }
+  ```
+
+#### `DELETE /api/escooty/dashboard/:id` — Delete Dashboard by database ID.
 
 ---
 

@@ -25,6 +25,7 @@ router.route('/register')
     .post(validateIndianPhone, escootyController.createDashboard); // POST /api/escooty/register
 
 router.post('/emergency', dataController.triggerManualEmergency); // POST /api/escooty/emergency
+router.post('/ignition', dataController.setIgnitionStatus);       // POST /api/escooty/ignition
 
 // Delete dashboard by deviceId (hardware signature)
 router.route('/node/:deviceId')
@@ -33,6 +34,17 @@ router.route('/node/:deviceId')
 router.route('/:id')
     .put(escootyController.updateDashboard)   // PUT  /api/escooty/:id
     .delete(escootyController.deleteDashboard); // DELETE /api/escooty/:id
+
+// ===================================================
+// Dashboard Management Endpoints — base path: /api/escooty/dashboard
+// ===================================================
+router.route('/dashboard')
+    .get(escootyController.getAllDashboards)
+    .post(validateIndianPhone, escootyController.createDashboard);
+
+router.route('/dashboard/:id')
+    .put(escootyController.updateDashboard)
+    .delete(escootyController.deleteDashboard);
 
 // ===================================================
 // Device Endpoints — base path: /api/escooty/device

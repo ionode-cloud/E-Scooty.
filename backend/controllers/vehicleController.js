@@ -1,5 +1,6 @@
 const DeviceData = require('../models/DeviceData');
 const Device = require('../models/Device');
+const Dashboard = require('../models/Dashboard');
 
 // Store battery SOC, battery voltage, battery temperature, GPS, and motor/wheel metrics.
 exports.storeVehicleData = async (req, res) => {
@@ -75,8 +76,49 @@ exports.getVehicleHistory = async (req, res) => {
             }
         }
 
-        const history = await DeviceData.find(query).sort({ timestamp: -1 }).limit(parseInt(limit));
-        res.status(200).json(history);
+        const [dashboard, history] = await Promise.all([
+            Dashboard.findOne({ deviceId }),
+            DeviceData.find(query).sort({ timestamp: -1 }).limit(parseInt(limit))
+        ]);
+
+        if (!dashboard) {
+            return res.status(200).json(history);
+        }
+
+        const features = dashboard.enabledFeatures || [];
+        const filteredHistory = history.map(item => {
+            const doc = item.toObject();
+            const filtered = {
+                _id: doc._id,
+                deviceId: doc.deviceId,
+                timestamp: doc.timestamp,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+                action: doc.action,
+                warningLevel: doc.warningLevel,
+                accidentDetected: doc.accidentDetected,
+            };
+
+            if (features.includes('batterySOC')) filtered.batterySOC = doc.batterySOC;
+            if (features.includes('batterySOH')) filtered.batterySOH = doc.batterySOH;
+            if (features.includes('speed')) filtered.speed = doc.speed;
+            if (features.includes('batteryVoltage')) filtered.batteryVoltage = doc.batteryVoltage;
+            if (features.includes('batteryTemperature')) filtered.batteryTemperature = doc.batteryTemperature;
+            if (features.includes('motorTemperature')) filtered.motorTemperature = doc.motorTemperature;
+            if (features.includes('motorRPM')) filtered.motorRPM = doc.motorRPM;
+            if (features.includes('ignitionSwitch')) filtered.ignitionStatus = doc.ignitionStatus;
+            if (features.includes('gps')) {
+                filtered.gpsLatitude = doc.gpsLatitude;
+                filtered.gpsLongitude = doc.gpsLongitude;
+            }
+            if (features.includes('wheelRPM')) filtered.wheelRPM = doc.wheelRPM;
+            if (features.includes('loss')) filtered.loss = doc.loss;
+            if (features.includes('torque')) filtered.torque = doc.torque;
+
+            return filtered;
+        });
+
+        res.status(200).json(filteredHistory);
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }

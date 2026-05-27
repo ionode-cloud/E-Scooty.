@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     PlusCircle, Cpu, MapPin, CheckCircle2, AlertCircle, Sparkles, ChevronRight, User,
-    ShieldCheck, MonitorCheck, LayoutGrid, Bike, Mail, BellRing, Trash2
+    ShieldCheck, MonitorCheck, LayoutGrid, Bike, Mail, BellRing, Trash2,
+    Gauge, Thermometer, Power, Settings2, Shield, Activity, ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +20,27 @@ const CreateDashboard = () => {
     const [success, setSuccess] = useState('');
     const [createdParticleId, setCreatedParticleId] = useState('');
     const [devices, setDevices] = useState([]);
+    const [enabledWidgets, setEnabledWidgets] = useState([]);
+
+    // All widgets are manually selectable — nothing is pre-selected
+    const WIDGET_OPTIONS = [
+        { key: 'batterySOC',         label: 'Battery SOC',       icon: <Bike size={16} /> },
+        { key: 'batterySOH',         label: 'Battery SOH',       icon: <Shield size={16} /> },
+        { key: 'batteryVoltage',     label: 'Battery Voltage',   icon: <Gauge size={16} /> },
+        { key: 'batteryTemperature', label: 'Battery Temp',      icon: <Thermometer size={16} /> },
+        { key: 'speed',              label: 'Current Speed',     icon: <Activity size={16} /> },
+        { key: 'gps',                label: 'GPS Map',           icon: <MapPin size={16} /> },
+        { key: 'motorRPM',           label: 'Motor RPM',         icon: <Gauge size={16} /> },
+        { key: 'motorTemperature',   label: 'Motor Temperature', icon: <Thermometer size={16} /> },
+        { key: 'ignitionSwitch',     label: 'Ignition Switch',   icon: <Power size={16} /> },
+        { key: 'systemStatus',       label: 'System Status',     icon: <ShieldAlert size={16} /> },
+    ];
+
+    const toggleWidget = (key) => {
+        setEnabledWidgets(prev =>
+            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+        );
+    };
 
     useEffect(() => {
         if (user?.email) setEmail(user.email);
@@ -86,6 +108,7 @@ const CreateDashboard = () => {
                     email, 
                     password, 
                     description, 
+                    enabledFeatures: enabledWidgets,
                     emergencyContacts: emergencyContacts.filter(c => c.trim() !== '') 
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -205,6 +228,87 @@ const CreateDashboard = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Widget Selection Section */}
+                <div className="saas-card p-8 flex flex-col gap-6">
+                    <div className="flex items-center gap-3 pb-4 border-b border-[#F1F5F9]">
+                        <Settings2 size={18} className="text-[#22C55E]" />
+                        <div>
+                            <h3 className="text-sm font-black text-[#064E3B] uppercase tracking-wider">Widget Selection</h3>
+                            <p className="text-[10px] text-[#94A3B8] font-medium mt-0.5">
+                                Choose which cards appear on this dashboard. Core widgets are always enabled.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 -mt-2">
+                        <button
+                            type="button"
+                            onClick={() => setEnabledWidgets(WIDGET_OPTIONS.map(w => w.key))}
+                            className="text-[10px] font-black text-[#22C55E] uppercase tracking-widest hover:opacity-70 transition-opacity"
+                        >
+                            Select All
+                        </button>
+                        <span className="text-[#CBD5E1] text-xs">|</span>
+                        <button
+                            type="button"
+                            onClick={() => setEnabledWidgets([])}
+                            className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest hover:opacity-70 transition-opacity"
+                        >
+                            Clear All
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {WIDGET_OPTIONS.map(widget => {
+                            const isOn = enabledWidgets.includes(widget.key);
+                            return (
+                                <button
+                                    key={widget.key}
+                                    type="button"
+                                    onClick={() => toggleWidget(widget.key)}
+                                    className={`relative flex flex-col items-start gap-3 p-4 rounded-2xl border-2 text-left transition-all duration-300 cursor-pointer
+                                        ${isOn
+                                            ? 'bg-[#064E3B] border-[#10B981] shadow-lg shadow-emerald-500/15'
+                                            : 'bg-white border-[#E5E7EB] hover:border-[#10B981] hover:shadow-md'
+                                        }
+                                    `}
+                                >
+                                    {/* Status pill */}
+                                    <span className={`absolute top-2 right-2 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full
+                                        ${isOn ? 'bg-white/20 text-white' : 'bg-[#F1F5F9] text-[#94A3B8]'}
+                                    `}>
+                                        {isOn ? 'ON' : 'OFF'}
+                                    </span>
+
+                                    {/* Icon */}
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center
+                                        ${isOn ? 'bg-white/15 text-white' : 'bg-[#F8FAFC] text-[#94A3B8]'}
+                                    `}>
+                                        {widget.icon}
+                                    </div>
+
+                                    {/* Label */}
+                                    <span className={`text-[11px] font-black uppercase tracking-wide leading-tight
+                                        ${isOn ? 'text-white' : 'text-[#374151]'}
+                                    `}>
+                                        {widget.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex items-start gap-2 p-3 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl">
+                        <MonitorCheck size={14} className="text-[#10B981] mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-[#6B7280] font-medium leading-relaxed">
+                            {enabledWidgets.length === 0
+                                ? <span className="font-black text-[#94A3B8]">No widgets selected — dashboard will have no cards.</span>
+                                : <><span className="font-black text-[#064E3B]">{enabledWidgets.length}</span> widget{enabledWidgets.length > 1 ? 's' : ''} selected: <span className="font-black text-[#064E3B]">{enabledWidgets.join(', ')}</span></>
+                            }
+                        </p>
                     </div>
                 </div>
 

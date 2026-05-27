@@ -1,5 +1,7 @@
 const Dashboard = require('../models/Dashboard');
 const Device = require('../models/Device');
+const User = require('../models/User');
+const crypto = require('crypto');
 const { triggerEmergencyAlerts } = require('../utils/smsService');
 
 // =============================
@@ -17,13 +19,34 @@ exports.getAllDashboards = async (req, res) => {
 
 exports.createDashboard = async (req, res) => {
     try {
-        const { deviceId } = req.body;
-        const existing = await Dashboard.findOne({ deviceId });
-        if (existing) {
-            return res.status(400).json({ message: `A dashboard for device ID "${deviceId}" already exists.` });
+        const { dashboardName, deviceId, user, email, particleId } = req.body;
+        
+        let userId = user;
+        
+        // Auto-generate or resolve user mapping
+        if (!userId) {
+            const userEmail = email || (req.user ? req.user.email : 'admin@escooty.com');
+            let foundUser = await User.findOne({ email: userEmail });
+            if (!foundUser) {
+                foundUser = new User({
+                    email: userEmail,
+                    password: 'defaultpassword123',
+                    role: 'admin',
+                    isVerified: true
+                });
+                await foundUser.save();
+            }
+            userId = foundUser._id;
         }
-
-        const newDashboard = new Dashboard(req.body);
+        
+        const finalParticleId = particleId || crypto.randomBytes(12).toString('hex');
+        
+        const newDashboard = new Dashboard({
+            ...req.body,
+            user: userId,
+            particleId: finalParticleId
+        });
+        
         await newDashboard.save();
 
         // Send Welcome SMS to Emergency Contacts

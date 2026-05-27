@@ -37,23 +37,18 @@ const deviceDataSchema = new mongoose.Schema({
     },
     speed: {
         type: Number,
-        default: 0,
     },
     motorRPM: {
         type: Number,
-        default: 0,
     },
     wheelRPM: {
         type: Number,
-        default: 0,
     },
     loss: {
         type: Number,
-        default: 0,
     },
     torque: {
         type: Number,
-        default: 0,
     },
     flRadar: {
         type: Number,
@@ -89,6 +84,10 @@ const deviceDataSchema = new mongoose.Schema({
         type: String,
         enum: ['ON', 'OFF'],
         default: 'OFF',
+    },
+    ignitionStatus: {
+        type: String,
+        enum: ['ON', 'OFF'],
     },
     action: {
         type: String, // e.g., 'TELEMETRY_SYNC', 'EMERGENCY_TRIGGER'

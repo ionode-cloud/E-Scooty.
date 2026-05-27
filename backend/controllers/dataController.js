@@ -27,7 +27,7 @@ exports.receiveData = async (req, res) => {
             latitude, longitude, speed,
             flRadar, frRadar, rlRadar, rrRadar, 
             brakeStatus, lux, headlightStatus,
-            accidentDetected
+            accidentDetected, ignitionStatus
         } = req.body;
 
         // Validate device connection
@@ -40,13 +40,13 @@ exports.receiveData = async (req, res) => {
         device.lastSeen = new Date();
         await device.save();
 
-        let mappedBrakeStatus = brakeStatus;
-        if (brakeStatus === 1 || brakeStatus === '1') mappedBrakeStatus = 'APPLIED';
-        else if (brakeStatus === 0 || brakeStatus === '0') mappedBrakeStatus = 'RELEASED';
+        const normalizedBrake = String(brakeStatus || '').trim().toUpperCase();
+        let mappedBrakeStatus = 'RELEASED';
+        if (normalizedBrake === '1' || normalizedBrake === 'APPLIED') mappedBrakeStatus = 'APPLIED';
 
-        let mappedHeadlightStatus = headlightStatus;
-        if (headlightStatus === 1 || headlightStatus === '1') mappedHeadlightStatus = 'ON';
-        else if (headlightStatus === 0 || headlightStatus === '0') mappedHeadlightStatus = 'OFF';
+        const normalizedHeadlight = String(headlightStatus || '').trim().toUpperCase();
+        let mappedHeadlightStatus = 'OFF';
+        if (normalizedHeadlight === '1' || normalizedHeadlight === 'ON') mappedHeadlightStatus = 'ON';
 
         // Record emergency brake timestamp when brake is applied
         const emergencyBrakeTimestamp = (mappedBrakeStatus === 'APPLIED') ? new Date() : null;
@@ -55,6 +55,10 @@ exports.receiveData = async (req, res) => {
         const accidentFlag = accidentDetected === true || accidentDetected === 1 || accidentDetected === '1';
 
         const warningLevel = getWarningLevel(batteryTemp);
+
+        const normalizedIgnition = String(ignitionStatus || '').trim().toUpperCase();
+        let mappedIgnitionStatus = 'OFF';
+        if (normalizedIgnition === '1' || normalizedIgnition === 'ON') mappedIgnitionStatus = 'ON';
 
         const newData = new DeviceData({
             deviceId,
@@ -80,6 +84,7 @@ exports.receiveData = async (req, res) => {
             lux,
             headlightStatus: mappedHeadlightStatus,
             accidentDetected: accidentFlag,
+            ignitionStatus: mappedIgnitionStatus || 'OFF',
         });
 
         await newData.save();
@@ -142,8 +147,49 @@ exports.receiveData = async (req, res) => {
 exports.getHistory = async (req, res) => {
     try {
         const { deviceId } = req.params;
-        const history = await DeviceData.find({ deviceId }).sort({ timestamp: -1 }).limit(100);
-        res.status(200).json(history);
+        const [dashboard, history] = await Promise.all([
+            Dashboard.findOne({ deviceId }),
+            DeviceData.find({ deviceId }).sort({ timestamp: -1 }).limit(100)
+        ]);
+
+        if (!dashboard) {
+            return res.status(200).json(history);
+        }
+
+        const features = dashboard.enabledFeatures || [];
+        const filteredHistory = history.map(item => {
+            const doc = item.toObject();
+            const filtered = {
+                _id: doc._id,
+                deviceId: doc.deviceId,
+                timestamp: doc.timestamp,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+                action: doc.action,
+                warningLevel: doc.warningLevel,
+                accidentDetected: doc.accidentDetected,
+            };
+
+            if (features.includes('batterySOC')) filtered.batterySOC = doc.batterySOC;
+            if (features.includes('batterySOH')) filtered.batterySOH = doc.batterySOH;
+            if (features.includes('speed')) filtered.speed = doc.speed;
+            if (features.includes('batteryVoltage')) filtered.batteryVoltage = doc.batteryVoltage;
+            if (features.includes('batteryTemperature')) filtered.batteryTemperature = doc.batteryTemperature;
+            if (features.includes('motorTemperature')) filtered.motorTemperature = doc.motorTemperature;
+            if (features.includes('motorRPM')) filtered.motorRPM = doc.motorRPM;
+            if (features.includes('ignitionSwitch')) filtered.ignitionStatus = doc.ignitionStatus;
+            if (features.includes('gps')) {
+                filtered.gpsLatitude = doc.gpsLatitude;
+                filtered.gpsLongitude = doc.gpsLongitude;
+            }
+            if (features.includes('wheelRPM')) filtered.wheelRPM = doc.wheelRPM;
+            if (features.includes('loss')) filtered.loss = doc.loss;
+            if (features.includes('torque')) filtered.torque = doc.torque;
+
+            return filtered;
+        });
+
+        res.status(200).json(filteredHistory);
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
@@ -159,41 +205,83 @@ exports.downloadExcel = async (req, res) => {
             query.timestamp = { $gte: new Date(startDate), $lte: new Date(endDate) };
         }
 
-        const data = await DeviceData.find(query).sort({ timestamp: -1 });
+        const [dashboard, data] = await Promise.all([
+            Dashboard.findOne({ deviceId }),
+            DeviceData.find(query).sort({ timestamp: -1 })
+        ]);
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Device Data Logs');
 
-        worksheet.columns = [
-            { header: 'Device ID', key: 'deviceId', width: 20 },
-            { header: 'Battery Temp (°C)', key: 'batteryTemperature', width: 15 },
-            { header: 'Battery SOC (%)', key: 'batterySOC', width: 15 },
-            { header: 'Battery Voltage (V)', key: 'batteryVoltage', width: 15 },
-            { header: 'Motor Temp (°C)', key: 'motorTemperature', width: 15 },
-            { header: 'Motor RPM', key: 'motorRPM', width: 15 },
-            { header: 'Wheel RPM', key: 'wheelRPM', width: 15 },
-            { header: 'Loss', key: 'loss', width: 12 },
-            { header: 'Torque (Nm)', key: 'torque', width: 12 },
-            { header: 'Latitude', key: 'gpsLatitude', width: 15 },
-            { header: 'Longitude', key: 'gpsLongitude', width: 15 },
-            { header: 'Timestamp', key: 'timestamp', width: 25 },
+        const features = dashboard ? (dashboard.enabledFeatures || []) : [
+            'batterySOC', 'batteryVoltage', 'batteryTemperature', 'gps', 'motorRPM', 'motorTemperature'
         ];
 
+        const columns = [
+            { header: 'Device ID', key: 'deviceId', width: 20 }
+        ];
+
+        if (features.includes('batterySOC')) {
+            columns.push({ header: 'Battery SOC (%)', key: 'batterySOC', width: 15 });
+        }
+        if (features.includes('batterySOH')) {
+            columns.push({ header: 'Battery SOH (%)', key: 'batterySOH', width: 15 });
+        }
+        if (features.includes('batteryVoltage')) {
+            columns.push({ header: 'Battery Voltage (V)', key: 'batteryVoltage', width: 15 });
+        }
+        if (features.includes('batteryTemperature')) {
+            columns.push({ header: 'Battery Temp (°C)', key: 'batteryTemperature', width: 15 });
+        }
+        if (features.includes('speed')) {
+            columns.push({ header: 'Speed (km/h)', key: 'speed', width: 15 });
+        }
+        if (features.includes('motorTemperature')) {
+            columns.push({ header: 'Motor Temp (°C)', key: 'motorTemperature', width: 15 });
+        }
+        if (features.includes('motorRPM')) {
+            columns.push({ header: 'Motor RPM', key: 'motorRPM', width: 15 });
+        }
+        if (features.includes('wheelRPM')) {
+            columns.push({ header: 'Wheel RPM', key: 'wheelRPM', width: 15 });
+        }
+        if (features.includes('loss')) {
+            columns.push({ header: 'Loss', key: 'loss', width: 12 });
+        }
+        if (features.includes('torque')) {
+            columns.push({ header: 'Torque (Nm)', key: 'torque', width: 12 });
+        }
+        if (features.includes('gps')) {
+            columns.push({ header: 'Latitude', key: 'gpsLatitude', width: 15 });
+            columns.push({ header: 'Longitude', key: 'gpsLongitude', width: 15 });
+        }
+
+        columns.push({ header: 'Timestamp', key: 'timestamp', width: 25 });
+
+        worksheet.columns = columns;
+
         data.forEach(item => {
-            worksheet.addRow({
+            const rowData = {
                 deviceId: item.deviceId,
-                batteryTemperature: item.batteryTemperature,
-                batterySOC: item.batterySOC,
-                batteryVoltage: item.batteryVoltage,
-                motorTemperature: item.motorTemperature,
-                motorRPM: item.motorRPM,
-                wheelRPM: item.wheelRPM,
-                loss: item.loss,
-                torque: item.torque,
-                gpsLatitude: item.gpsLatitude,
-                gpsLongitude: item.gpsLongitude,
                 timestamp: item.timestamp,
-            });
+            };
+
+            if (features.includes('batterySOC')) rowData.batterySOC = item.batterySOC;
+            if (features.includes('batterySOH')) rowData.batterySOH = item.batterySOH;
+            if (features.includes('batteryVoltage')) rowData.batteryVoltage = item.batteryVoltage;
+            if (features.includes('batteryTemperature')) rowData.batteryTemperature = item.batteryTemperature;
+            if (features.includes('speed')) rowData.speed = item.speed;
+            if (features.includes('motorTemperature')) rowData.motorTemperature = item.motorTemperature;
+            if (features.includes('motorRPM')) rowData.motorRPM = item.motorRPM;
+            if (features.includes('wheelRPM')) rowData.wheelRPM = item.wheelRPM;
+            if (features.includes('loss')) rowData.loss = item.loss;
+            if (features.includes('torque')) rowData.torque = item.torque;
+            if (features.includes('gps')) {
+                rowData.gpsLatitude = item.gpsLatitude;
+                rowData.gpsLongitude = item.gpsLongitude;
+            }
+
+            worksheet.addRow(rowData);
         });
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -207,7 +295,7 @@ exports.downloadExcel = async (req, res) => {
 };
 
 // Fields returned by the simplified /api/escooty endpoints
-const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage batteryTemperature speed brakeStatus gpsLatitude gpsLongitude action timestamp';
+const CORE_FIELDS = 'deviceId batterySOC batterySOH batteryVoltage batteryTemperature motorTemperature motorRPM speed brakeStatus gpsLatitude gpsLongitude ignitionStatus action timestamp';
 
 // Helper: pick only the core fields from a Mongoose document
 const pickCoreFields = (doc) => ({
@@ -217,10 +305,13 @@ const pickCoreFields = (doc) => ({
     batterySOH:         doc.batterySOH,
     batteryVoltage:     doc.batteryVoltage,
     batteryTemperature: doc.batteryTemperature,
+    motorTemperature:   doc.motorTemperature,
+    motorRPM:           doc.motorRPM,
     speed:              doc.speed,
     brakeStatus:        doc.brakeStatus,
     gpsLatitude:        doc.gpsLatitude,
     gpsLongitude:       doc.gpsLongitude,
+    ignitionStatus:     doc.ignitionStatus,
     action:             doc.action,
     timestamp:          doc.timestamp,
 });
@@ -230,7 +321,9 @@ exports.syncCoreData = async (req, res) => {
     try {
         const { 
             deviceId, timestamp, batterySOC, batterySOH, batteryVoltage, 
-            speed, Speed, brakeStatus, latitude, longitude, gpsLatitude, gpsLongitude, action 
+            motorTemperature, motorRPM,
+            speed, Speed, brakeStatus, latitude, longitude, gpsLatitude, gpsLongitude,
+            ignitionStatus, action 
         } = req.body;
 
         if (!deviceId) return res.status(400).json({ message: 'deviceId is required' });
@@ -242,42 +335,72 @@ exports.syncCoreData = async (req, res) => {
         device.lastSeen = new Date();
         await device.save();
 
-        const mappedBrakeStatus = (brakeStatus === 1 || brakeStatus === '1' || brakeStatus === 'APPLIED') ? 'APPLIED' : 'RELEASED';
+        const dashboards = await Dashboard.find({ deviceId });
+        const hasDashboards = dashboards.length > 0;
+        
+        // Compile enabled features from all dashboards matching deviceId
+        const enabled = new Set();
+        if (hasDashboards) {
+            dashboards.forEach(d => {
+                if (d.enabledFeatures) {
+                    d.enabledFeatures.forEach(f => enabled.add(f));
+                }
+            });
+        }
+
+        const isEnabled = (feature) => {
+            if (!hasDashboards) return true; // If no dashboard is configured, save all fields
+            return enabled.has(feature);
+        };
+
+        const normalizedBrake = String(brakeStatus || '').trim().toUpperCase();
+        const mappedBrakeStatus = (normalizedBrake === '1' || normalizedBrake === 'APPLIED') ? 'APPLIED' : 'RELEASED';
         const emergencyBrakeTimestamp = (mappedBrakeStatus === 'APPLIED') ? new Date() : null;
 
         const batteryTemp = Number(req.body.batteryTemperature || req.body.batteryTemp || 0);
         const warningLevel = getWarningLevel(batteryTemp);
 
+        const normalizedIgnition = String(ignitionStatus || '').trim().toUpperCase();
+        const mappedIgnitionStatus = (normalizedIgnition === 'ON' || normalizedIgnition === '1') ? 'ON' : 'OFF';
+
         const newData = new DeviceData({
             deviceId,
             timestamp: timestamp ? new Date(timestamp) : new Date(),
-            batterySOC:     Number(batterySOC || 0),
-            batterySOH:     Number(batterySOH || 0),
-            batteryVoltage: Number(batteryVoltage || 0),
-            batteryTemperature: batteryTemp,
-            warningLevel,
-            speed:          Number(speed || Speed || 0),
-            brakeStatus:    mappedBrakeStatus,
+            batterySOC:         isEnabled('batterySOC') && batterySOC !== undefined ? Number(batterySOC) : undefined,
+            batterySOH:         isEnabled('batterySOH') && batterySOH !== undefined ? Number(batterySOH) : undefined,
+            batteryVoltage:     isEnabled('batteryVoltage') && batteryVoltage !== undefined ? Number(batteryVoltage) : undefined,
+            batteryTemperature: isEnabled('batteryTemperature') ? batteryTemp : undefined,
+            warningLevel:       isEnabled('batteryTemperature') ? warningLevel : undefined,
+            motorTemperature:   isEnabled('motorTemperature') && motorTemperature !== undefined ? Number(motorTemperature) : undefined,
+            motorRPM:           isEnabled('motorRPM') && motorRPM !== undefined ? Number(motorRPM) : undefined,
+            speed:              isEnabled('speed') && (speed !== undefined || Speed !== undefined) ? Number(speed || Speed) : undefined,
+            brakeStatus:        mappedBrakeStatus,
             emergencyBrakeTimestamp,
-            gpsLatitude:    Number(latitude || gpsLatitude || 0),
-            gpsLongitude:   Number(longitude || gpsLongitude || 0),
-            action:         action || 'TELEMETRY_SYNC'
+            gpsLatitude:        isEnabled('gps') && (latitude !== undefined || gpsLatitude !== undefined) ? Number(latitude || gpsLatitude) : undefined,
+            gpsLongitude:       isEnabled('gps') && (longitude !== undefined || gpsLongitude !== undefined) ? Number(longitude || gpsLongitude) : undefined,
+            ignitionStatus:     isEnabled('ignitionSwitch') && ignitionStatus !== undefined ? mappedIgnitionStatus : undefined,
+            wheelRPM:           isEnabled('wheelRPM') && req.body.wheelRPM !== undefined ? Number(req.body.wheelRPM) : undefined,
+            loss:               isEnabled('loss') && req.body.loss !== undefined ? Number(req.body.loss) : undefined,
+            torque:             isEnabled('torque') && req.body.torque !== undefined ? Number(req.body.torque) : undefined,
+            action:             action || 'TELEMETRY_SYNC'
         });
 
         await newData.save();
         req.io.emit('device-data', newData);
 
         // PRODUCTION EMERGENCY WORKFLOW
-        const dashboard = await Dashboard.findOne({ deviceId });
+        const dashboard = dashboards[0];
         
         // Normalize action for comparison
         const normalizedAction = (action || '').trim();
         const emergencyActions = ['Accident Detected', 'Accident Detect', 'Battery Overheat', 'SOS Help', 'Theft Alert', 'Vehicle Theft'];
         
         const isValidEmergencyAction = normalizedAction !== '' && emergencyActions.includes(normalizedAction);
+        const isBrakeEmergency = (mappedBrakeStatus === 'APPLIED' && normalizedAction !== '');
+        const shouldTriggerAlert = isValidEmergencyAction || isBrakeEmergency;
         
-        if (dashboard && isValidEmergencyAction) {
-            const currentAction = normalizedAction;
+        if (dashboard && shouldTriggerAlert) {
+            const currentAction = isValidEmergencyAction ? normalizedAction : 'EMERGENCY_BRAKE';
             
             // 1. Create Alert History Record
             const alert = new AlertHistory({
@@ -651,5 +774,49 @@ exports.triggerManualEmergency = async (req, res) => {
         res.status(200).json({ success: true, message: `Emergency alert "${alertType}" sent to contacts.` });
     } catch (error) {
         res.status(500).json({ message: 'Error triggering emergency', error: error.message });
+    }
+};
+
+// POST /api/escooty/ignition — set ignition ON/OFF for a device
+exports.setIgnitionStatus = async (req, res) => {
+    try {
+        const { deviceId, ignitionStatus } = req.body;
+
+        if (!deviceId || !ignitionStatus) {
+            return res.status(400).json({ message: 'deviceId and ignitionStatus are required' });
+        }
+
+        const validStatuses = ['ON', 'OFF'];
+        const normalizedStatus = String(ignitionStatus).toUpperCase();
+        if (!validStatuses.includes(normalizedStatus)) {
+            return res.status(400).json({ message: 'ignitionStatus must be "ON" or "OFF"' });
+        }
+
+        const device = await Device.findOne({ deviceId });
+        if (!device) return res.status(404).json({ message: 'Device node not found' });
+
+        // Create a lightweight telemetry record capturing the ignition event
+        const latestData = await DeviceData.findOne({ deviceId }).sort({ timestamp: -1 });
+        const ignitionRecord = new DeviceData({
+            ...(latestData ? latestData.toObject() : {}),
+            _id: undefined,
+            deviceId,
+            ignitionStatus: normalizedStatus,
+            action: `IGNITION_${normalizedStatus}`,
+            timestamp: new Date(),
+        });
+        await ignitionRecord.save();
+
+        // Emit real-time update
+        req.io.emit('device-data', ignitionRecord);
+        req.io.emit('ignition-update', { deviceId, ignitionStatus: normalizedStatus });
+
+        res.status(200).json({
+            success: true,
+            message: `Ignition set to ${normalizedStatus} for device ${deviceId}`,
+            ignitionStatus: normalizedStatus,
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error setting ignition status', error: error.message });
     }
 };

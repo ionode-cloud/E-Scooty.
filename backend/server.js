@@ -95,6 +95,12 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("Connected to MongoDB");
+    
+    // Drop the unique deviceId constraint index if it exists in the database
+    mongoose.connection.db.collection('dashboards').dropIndex('deviceId_1').catch(err => {
+      // Index might not exist or is already dropped, which is fine
+    });
+
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
