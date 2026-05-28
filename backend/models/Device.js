@@ -12,7 +12,7 @@ const deviceSchema = new mongoose.Schema({
     },
     location: {
         type: String,
-        required: true,
+        default: '',
     },
     lastSeen: {
         type: Date,

@@ -479,7 +479,23 @@ exports.getTelemetry = async (req, res) => {
         const { deviceId, limit = 100, startDate, endDate } = req.query;
 
         const query = {};
-        if (deviceId) query.deviceId = deviceId;
+
+        if (deviceId) {
+            // If a specific device is requested, verify it still has an active dashboard
+            const activeDashboard = await Dashboard.findOne({ deviceId });
+            if (!activeDashboard) {
+                // Dashboard deleted — return empty, don't expose orphaned data
+                return res.status(200).json([]);
+            }
+            query.deviceId = deviceId;
+        } else {
+            // No deviceId filter — only return data for devices with active dashboards
+            const activeDashboards = await Dashboard.find({}, 'deviceId').lean();
+            const activeDeviceIds = activeDashboards.map(d => d.deviceId);
+            if (activeDeviceIds.length === 0) return res.status(200).json([]);
+            query.deviceId = { $in: activeDeviceIds };
+        }
+
         if (startDate || endDate) {
             query.timestamp = {};
             if (startDate) query.timestamp.$gte = new Date(startDate);

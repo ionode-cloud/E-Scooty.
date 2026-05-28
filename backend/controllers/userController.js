@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Dashboard = require('../models/Dashboard');
 const bcrypt = require('bcrypt');
 
 // GET /api/users/me
@@ -126,7 +127,13 @@ exports.deleteUser = async (req, res) => {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        res.status(200).json({ message: 'User deleted successfully.' });
+        // Cascade: delete all dashboards belonging to this user
+        const dashboardResult = await Dashboard.deleteMany({ user: id });
+
+        res.status(200).json({
+            message: 'User deleted successfully.',
+            dashboardsDeleted: dashboardResult.deletedCount
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }

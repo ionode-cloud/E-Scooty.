@@ -103,7 +103,7 @@ const DeviceList = () => {
                         <input
                             type="text"
                             className="w-full bg-white border-2 border-[#D1FAE5] rounded-2xl py-3 pl-12 pr-4 text-sm font-bold text-[#064E3B] focus:outline-none focus:border-[#10B981] transition-all shadow-sm placeholder:text-[#94A3B8]"
-                            placeholder="Search device signature..."
+                            placeholder="Search device ..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
@@ -173,7 +173,7 @@ const DeviceList = () => {
                         <thead className="bg-[#F8FAFC]">
                             <tr>
                                 <th className="text-[#064E3B]">Vehicle Node</th>
-                                <th className="text-[#064E3B]">Signature</th>
+                                <th className="text-[#064E3B]">Device Id</th>
                                 <th className="text-[#064E3B]">Location</th>
                                 <th className="text-[#064E3B]">Pulse State</th>
                                 <th className="text-[#064E3B]">Diagnostic Time</th>

@@ -129,9 +129,20 @@ exports.getDashboards = async (req, res) => {
 exports.deleteDashboard = async (req, res) => {
     try {
         const { id } = req.params;
+        const DeviceData = require('../models/DeviceData');
+
         // Allows Admin to delete any dashboard
-        await Dashboard.findByIdAndDelete(id);
-        res.status(200).json({ message: 'Dashboard deleted successfully' });
+        const deleted = await Dashboard.findByIdAndDelete(id);
+        if (!deleted) return res.status(404).json({ message: 'Dashboard not found' });
+
+        // Cascade: purge all telemetry history for this dashboard's deviceId
+        const historyResult = await DeviceData.deleteMany({ deviceId: deleted.deviceId });
+
+        res.status(200).json({
+            message: 'Dashboard deleted successfully.',
+            deviceId: deleted.deviceId,
+            telemetryRecordsDeleted: historyResult.deletedCount
+        });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }

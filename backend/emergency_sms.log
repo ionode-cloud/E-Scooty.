@@ -151,3 +151,18 @@
 {"level":"error","message":"SMS Error [9040256988]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
 {"level":"info","message":"Retrying SMS to 9040256988... (1 left)"}
 {"level":"error","message":"SMS Error [9040256988]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"error","message":"SMS Error [9040682533]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682533... (2 left)"}
+{"level":"error","message":"SMS Error [9040682533]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682533... (1 left)"}
+{"level":"error","message":"SMS Error [9040682533]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"error","message":"SMS Error [9040682533]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682533... (2 left)"}
+{"level":"error","message":"SMS Error [9040682533]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682533... (1 left)"}
+{"level":"error","message":"SMS Error [9040682533]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"error","message":"SMS Error [9040682546]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682546... (2 left)"}
+{"level":"error","message":"SMS Error [9040682546]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682546... (1 left)"}
+{"level":"error","message":"SMS Error [9040682546]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
