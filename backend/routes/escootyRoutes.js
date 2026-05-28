@@ -31,33 +31,35 @@ router.post('/ignition', dataController.setIgnitionStatus);       // POST /api/e
 router.route('/node/:deviceId')
     .delete(escootyController.deleteDashboardByDeviceId);
 
-// Find / Update / Delete device by deviceId string (e.g. "ES101")
-router.route('/:deviceId')
-    .get(escootyController.getDeviceByDeviceId)      // GET    /api/escooty/:deviceId
-    .put(escootyController.updateDeviceByDeviceId)   // PUT    /api/escooty/:deviceId
-    .delete(escootyController.deleteDeviceByDeviceId); // DELETE /api/escooty/:deviceId
-
-
 // ===================================================
 // Dashboard Management Endpoints — base path: /api/escooty/dashboard
 // ===================================================
 router.route('/dashboard')
-    .get(escootyController.getAllDashboards)
-    .post(validateIndianPhone, escootyController.createDashboard);
+    .get(escootyController.getAllDashboards)                        // GET    /api/escooty/dashboard
+    .post(validateIndianPhone, escootyController.createDashboard); // POST   /api/escooty/dashboard
 
 router.route('/dashboard/:id')
-    .put(escootyController.updateDashboard)
-    .delete(escootyController.deleteDashboard);
+    .put(escootyController.updateDashboard)                         // PUT    /api/escooty/dashboard/:id
+    .delete(escootyController.deleteDashboard);                     // DELETE /api/escooty/dashboard/:id
 
 // ===================================================
 // Device Endpoints — base path: /api/escooty/device
 // ===================================================
 router.route('/device')
-    .get(escootyController.getAllDevices)
-    .post(escootyController.createDevice);
+    .get(escootyController.getAllDevices)    // GET  /api/escooty/device
+    .post(escootyController.createDevice);  // POST /api/escooty/device
 
 router.route('/device/:id')
-    .put(escootyController.updateDevice)
-    .delete(escootyController.deleteDevice);
+    .put(escootyController.updateDevice)     // PUT    /api/escooty/device/:id
+    .delete(escootyController.deleteDevice); // DELETE /api/escooty/device/:id
+
+// ===================================================
+// Find Device by deviceId string — MUST be last to avoid
+// swallowing named routes like /dashboard and /device
+// ===================================================
+router.route('/:deviceId')
+    .get(escootyController.getDeviceByDeviceId)        // GET    /api/escooty/:deviceId
+    .put(escootyController.updateDeviceByDeviceId)     // PUT    /api/escooty/:deviceId
+    .delete(escootyController.deleteDeviceByDeviceId); // DELETE /api/escooty/:deviceId
 
 module.exports = router;
