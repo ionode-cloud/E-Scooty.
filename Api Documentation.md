@@ -107,46 +107,122 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 **Description:** Removes dashboard and purges all telemetry history.
 
 ### 3.3 Full Dashboard CRUD API — `/api/escooty/dashboard`
-**Description:** Direct dashboard CRUD operations.
+**Description:** Complete CRUD operations for managing E-Scooty dashboards.
+
+---
 
 #### `GET /api/escooty/dashboard` — Get All Dashboards
-- **Response (JSON Array):**
-  ```json
-  [
-    {
-      "_id": "60d5ec4b868e821f584f2e5a",
-      "dashboardName": "E-Scooty ES101",
-      "deviceId": "ES101",
-      "particleId": "7a3592bc13d5089f2a24ec6f",
-      "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
-      "description": "Premium Fleet Unit",
-      "emergencyContacts": ["+919876543210"]
-    }
-  ]
-  ```
+**Description:** Returns a list of all registered dashboards.
 
-#### `POST /api/escooty/dashboard` — Create Dashboard
-- **Body (JSON):**
-  ```json
+**Request:** No body required.
+
+**Response (200 — JSON Array):**
+```json
+[
   {
+    "_id": "60d5ec4b868e821f584f2e5a",
     "dashboardName": "E-Scooty ES101",
     "deviceId": "ES101",
+    "particleId": "7a3592bc13d5089f2a24ec6f",
     "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
     "description": "Premium Fleet Unit",
-    "emergencyContacts": ["+919876543210"]
+    "emergencyContacts": ["+919876543210"],
+    "createdAt": "2026-05-01T08:00:00.000Z",
+    "updatedAt": "2026-05-28T10:00:00.000Z"
   }
-  ```
+]
+```
+
+---
+
+#### `POST /api/escooty/dashboard` — Create Dashboard
+**Description:** Registers a new dashboard. Sends a Welcome SMS to all emergency contacts on success.
+
+**Body (JSON):**
+```json
+{
+  "dashboardName": "E-Scooty ES101",
+  "deviceId": "ES101",
+  "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
+  "description": "Premium Fleet Unit",
+  "emergencyContacts": ["+919876543210", "+919988776655"]
+}
+```
+
+**Field Reference:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `dashboardName` | String | ✅ | Display name for the dashboard |
+| `deviceId` | String | ✅ | Unique hardware ID (e.g. `ES101`) |
+| `enabledFeatures` | String[] | ❌ | Features to display on the dashboard |
+| `description` | String | ❌ | Short description of the unit |
+| `emergencyContacts` | String[] | ❌ | Indian phone numbers (max 10, format: `+91XXXXXXXXXX`) |
+
+**Available `enabledFeatures` values:**
+`batterySOC`, `batteryVoltage`, `batteryTemperature`, `motorTemperature`, `motorRPM`, `wheelRPM`, `loss`, `torque`, `gps`, `ignitionSwitch`, `batterySOH`, `speed`, `systemStatus`
+
+**Response (201):**
+```json
+{
+  "_id": "60d5ec4b868e821f584f2e5a",
+  "dashboardName": "E-Scooty ES101",
+  "deviceId": "ES101",
+  "particleId": "auto-generated-hex-id",
+  "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
+  "description": "Premium Fleet Unit",
+  "emergencyContacts": ["+919876543210"]
+}
+```
+
+---
 
 #### `PUT /api/escooty/dashboard/:id` — Update Dashboard
-- **Body (JSON):**
-  ```json
-  {
-    "dashboardName": "Updated E-Scooty ES101",
-    "enabledFeatures": ["batterySOC", "batteryVoltage", "gps", "batteryTemperature"]
-  }
-  ```
+**Description:** Updates an existing dashboard by its MongoDB `_id`.
 
-#### `DELETE /api/escooty/dashboard/:id` — Delete Dashboard by database ID.
+**Example:** `PUT /api/escooty/dashboard/60d5ec4b868e821f584f2e5a`
+
+**Body (JSON) — include only fields to update:**
+```json
+{
+  "dashboardName": "Updated E-Scooty ES101",
+  "enabledFeatures": ["batterySOC", "batteryVoltage", "gps", "batteryTemperature"],
+  "emergencyContacts": ["+919876543210", "+917788996655"]
+}
+```
+
+**Response (200):**
+```json
+{
+  "_id": "60d5ec4b868e821f584f2e5a",
+  "dashboardName": "Updated E-Scooty ES101",
+  "deviceId": "ES101",
+  "enabledFeatures": ["batterySOC", "batteryVoltage", "gps", "batteryTemperature"],
+  "updatedAt": "2026-05-28T14:30:00.000Z"
+}
+```
+
+**Response (404):**
+```json
+{ "message": "Dashboard not found" }
+```
+
+---
+
+#### `DELETE /api/escooty/dashboard/:id` — Delete Dashboard
+**Description:** Permanently deletes a dashboard record by its MongoDB `_id`.
+
+**Example:** `DELETE /api/escooty/dashboard/60d5ec4b868e821f584f2e5a`
+
+**Response (200):**
+```json
+{ "message": "Dashboard deleted successfully" }
+```
+
+**Response (404):**
+```json
+{ "message": "Dashboard not found" }
+```
 
 ---
 
