@@ -150,7 +150,77 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 
 ---
 
-## 4. Temperature Thresholds (Auto-Trigger)
+## 4. Find Device by Device ID — `/api/escooty/:deviceId`
+
+Lookup, update, or delete a **Device** record using its human-readable `deviceId` string (e.g., `ES101`).
+
+### `GET /api/escooty/:deviceId` — Get Device
+**Description:** Fetch a single device by its `deviceId`.
+
+**Example:** `GET /api/escooty/ES101`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "...",
+    "deviceName": "E-Scooty Alpha",
+    "deviceId": "ES101",
+    "location": "Bhubaneswar",
+    "status": "Online",
+    "otaUpdatePending": false,
+    "otaFirmwareUrl": "",
+    "lastSeen": "2026-05-28T10:00:00.000Z"
+  }
+}
+```
+
+**Response (404):**
+```json
+{ "success": false, "message": "Device \"ES101\" not found." }
+```
+
+---
+
+### `PUT /api/escooty/:deviceId` — Update Device
+**Description:** Update one or more fields of a device by `deviceId`.
+
+**Example:** `PUT /api/escooty/ES101`
+
+**Body (JSON) — include only fields to update:**
+```json
+{
+  "deviceName": "E-Scooty Alpha v2",
+  "location": "Cuttack",
+  "status": "Online"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Device \"ES101\" updated successfully.",
+  "data": { ... }
+}
+```
+
+---
+
+### `DELETE /api/escooty/:deviceId` — Delete Device
+**Description:** Permanently removes the device record by `deviceId`.
+
+**Example:** `DELETE /api/escooty/ES101`
+
+**Response (200):**
+```json
+{ "success": true, "message": "Device \"ES101\" deleted successfully." }
+```
+
+---
+
+## 5. Temperature Thresholds (Auto-Trigger)
 The system automatically monitors `batteryTemperature` and sends SMS alerts if:
 *   **Danger Level:** Above 55°C (Triggers "Battery Overheat" SMS).
 *   **Accident Detection:** If `accidentDetected` flag is set in telemetry.

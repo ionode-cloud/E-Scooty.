@@ -31,9 +31,12 @@ router.post('/ignition', dataController.setIgnitionStatus);       // POST /api/e
 router.route('/node/:deviceId')
     .delete(escootyController.deleteDashboardByDeviceId);
 
-router.route('/:id')
-    .put(escootyController.updateDashboard)   // PUT  /api/escooty/:id
-    .delete(escootyController.deleteDashboard); // DELETE /api/escooty/:id
+// Find / Update / Delete device by deviceId string (e.g. "ES101")
+router.route('/:deviceId')
+    .get(escootyController.getDeviceByDeviceId)      // GET    /api/escooty/:deviceId
+    .put(escootyController.updateDeviceByDeviceId)   // PUT    /api/escooty/:deviceId
+    .delete(escootyController.deleteDeviceByDeviceId); // DELETE /api/escooty/:deviceId
+
 
 // ===================================================
 // Dashboard Management Endpoints — base path: /api/escooty/dashboard

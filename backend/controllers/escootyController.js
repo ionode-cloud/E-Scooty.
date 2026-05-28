@@ -115,6 +115,51 @@ exports.deleteDashboardByDeviceId = async (req, res) => {
 // DEVICE CONTROLLERS
 // =============================
 
+// --- Find Device by deviceId (GET / PUT / DELETE) ---
+
+exports.getDeviceByDeviceId = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const device = await Device.findOne({ deviceId });
+        if (!device) {
+            return res.status(404).json({ success: false, message: `Device "${deviceId}" not found.` });
+        }
+        res.status(200).json({ success: true, data: device });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error fetching device', error: error.message });
+    }
+};
+
+exports.updateDeviceByDeviceId = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const updated = await Device.findOneAndUpdate(
+            { deviceId },
+            req.body,
+            { new: true, runValidators: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ success: false, message: `Device "${deviceId}" not found.` });
+        }
+        res.status(200).json({ success: true, message: `Device "${deviceId}" updated successfully.`, data: updated });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error updating device', error: error.message });
+    }
+};
+
+exports.deleteDeviceByDeviceId = async (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const deleted = await Device.findOneAndDelete({ deviceId });
+        if (!deleted) {
+            return res.status(404).json({ success: false, message: `Device "${deviceId}" not found.` });
+        }
+        res.status(200).json({ success: true, message: `Device "${deviceId}" deleted successfully.` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error deleting device', error: error.message });
+    }
+};
+
 exports.getAllDevices = async (req, res) => {
     try {
         const devices = await Device.find();
