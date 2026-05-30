@@ -7,7 +7,7 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
 router.post('/device-data', dataController.receiveData); // Open API for ESP32
-router.post('/sync-core', dataController.syncCoreData); // Optimized E-Scooty Dashboard API
+router.post('/sync-core', dataController.syncCoreData); // Optimized E-Vehicle Dashboard API
 router.get('/history/:deviceId', dataController.getHistory); 
 router.get('/emergency-logs/:deviceId', dataController.getEmergencyLogs); 
 router.get('/alerts/:deviceId', dataController.getAlertHistory); 

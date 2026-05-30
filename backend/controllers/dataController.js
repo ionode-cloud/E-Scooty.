@@ -316,7 +316,7 @@ const pickCoreFields = (doc) => ({
     timestamp:          doc.timestamp,
 });
 
-// Simplified Core API for E-Scooty Dashboard
+// Simplified Core API for E-Vehicle Dashboard
 exports.syncCoreData = async (req, res) => {
     try {
         const { 

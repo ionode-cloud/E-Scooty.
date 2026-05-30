@@ -1,4 +1,4 @@
-# E-Scooty Dashboard API Documentation
+# E-Vehicle Dashboard API Documentation
 
 This document outlines the core API endpoints for synchronizing telemetry data between the vehicle nodes (hardware) and the monitoring dashboard, including the new Battery Thermal and Emergency Alert systems.
 
@@ -17,7 +17,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 ## 1. Core Telemetry Synchronization — `/api/escooty`
 
 ### `POST /api/escooty` — Create New Telemetry Record
-**Description:** Send real-time telemetry from the E-Scooty node.
+**Description:** Send real-time telemetry from the E-Vehicle node.
 **Body (JSON):**
 ```json
 {
@@ -95,7 +95,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 **Body (JSON):**
 ```json
 {
-  "dashboardName": "E-Scooty ES101",
+  "dashboardName": "E-Vehicle ES101",
   "deviceId": "ES101",
   "emergencyContacts": ["+919876543210", "+919988776655"],
   "description": "Premium Fleet Unit"
@@ -107,7 +107,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 **Description:** Removes dashboard and purges all telemetry history.
 
 ### 3.3 Full Dashboard CRUD API — `/api/escooty/dashboard`
-**Description:** Complete CRUD operations for managing E-Scooty dashboards.
+**Description:** Complete CRUD operations for managing E-Vehicle dashboards.
 
 ---
 
@@ -121,7 +121,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 [
   {
     "_id": "60d5ec4b868e821f584f2e5a",
-    "dashboardName": "E-Scooty ES101",
+    "dashboardName": "E-Vehicle ES101",
     "deviceId": "ES101",
     "particleId": "7a3592bc13d5089f2a24ec6f",
     "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
@@ -141,7 +141,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 **Body (JSON):**
 ```json
 {
-  "dashboardName": "E-Scooty ES101",
+  "dashboardName": "E-Vehicle ES101",
   "deviceId": "ES101",
   "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
   "description": "Premium Fleet Unit",
@@ -166,7 +166,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 ```json
 {
   "_id": "60d5ec4b868e821f584f2e5a",
-  "dashboardName": "E-Scooty ES101",
+  "dashboardName": "E-Vehicle ES101",
   "deviceId": "ES101",
   "particleId": "auto-generated-hex-id",
   "enabledFeatures": ["batterySOC", "batteryVoltage", "gps"],
@@ -185,7 +185,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 **Body (JSON) — include only fields to update:**
 ```json
 {
-  "dashboardName": "Updated E-Scooty ES101",
+  "dashboardName": "Updated E-Vehicle ES101",
   "enabledFeatures": ["batterySOC", "batteryVoltage", "gps", "batteryTemperature"],
   "emergencyContacts": ["+919876543210", "+917788996655"]
 }
@@ -195,7 +195,7 @@ This document outlines the core API endpoints for synchronizing telemetry data b
 ```json
 {
   "_id": "60d5ec4b868e821f584f2e5a",
-  "dashboardName": "Updated E-Scooty ES101",
+  "dashboardName": "Updated E-Vehicle ES101",
   "deviceId": "ES101",
   "enabledFeatures": ["batterySOC", "batteryVoltage", "gps", "batteryTemperature"],
   "updatedAt": "2026-05-28T14:30:00.000Z"
@@ -241,7 +241,7 @@ Lookup, update, or delete a **Device** record using its human-readable `deviceId
   "success": true,
   "data": {
     "_id": "...",
-    "deviceName": "E-Scooty Alpha",
+    "deviceName": "E-Vehicle Alpha",
     "deviceId": "ES101",
     "location": "Bhubaneswar",
     "status": "Online",
@@ -267,7 +267,7 @@ Lookup, update, or delete a **Device** record using its human-readable `deviceId
 **Body (JSON) — include only fields to update:**
 ```json
 {
-  "deviceName": "E-Scooty Alpha v2",
+  "deviceName": "E-Vehicle Alpha v2",
   "location": "Cuttack",
   "status": "Online"
 }

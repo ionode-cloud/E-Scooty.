@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
     LayoutDashboard, Server, PlusSquare, Settings, Database, 
     LogOut, Menu, X, Cpu, Bike, Home, PlusCircle, DownloadCloud, ClipboardList, UserCog
@@ -37,15 +37,15 @@ const Layout = () => {
         if (isAlertActive) {
             let toggle = false;
             interval = setInterval(() => {
-                document.title = toggle ? "🚨 EMERGENCY 🚨" : "E-Scooty Monitor";
+                document.title = toggle ? "🚨 EMERGENCY 🚨" : "E-Vehicle Monitor";
                 toggle = !toggle;
             }, 500);
         } else {
-            document.title = "E-Scooty Monitor";
+            document.title = "E-Vehicle Monitor";
         }
         return () => {
             if (interval) clearInterval(interval);
-            document.title = "E-Scooty Monitor";
+            document.title = "E-Vehicle Monitor";
         };
     }, [isAlertActive]);
 
@@ -67,7 +67,7 @@ const Layout = () => {
     const userInitial = userEmail.charAt(0).toUpperCase();
 
     const allNavLinks = [
-        { path: '/', icon: <Bike size={18} />, label: 'Monitor' },
+        { path: '/monitor', icon: <Bike size={18} />, label: 'Monitor' },
         { path: '/devices', icon: <Cpu size={18} />, label: 'Hardware' },
         { path: '/create-dashboard', icon: <PlusCircle size={18} />, label: 'Setup Node' },
         { path: '/infrastructure', icon: <DownloadCloud size={18} />, label: 'Updates' },
@@ -80,8 +80,8 @@ const Layout = () => {
 
     const navLinks = allNavLinks.filter(link => {
         if (isAdmin) return true;
-        if (isOperator) return ['/', '/devices', '/logs'].includes(link.path);
-        return ['/', '/devices'].includes(link.path);
+        if (isOperator) return ['/monitor', '/devices', '/logs'].includes(link.path);
+        return ['/monitor', '/devices'].includes(link.path);
     });
 
     return (
@@ -89,8 +89,8 @@ const Layout = () => {
             {/* Mobile Sidebar Overlay */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-                    onClick={() => setSidebarOpen(false)}
+                     className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
@@ -105,7 +105,7 @@ const Layout = () => {
                             <Bike size={20} className="text-white" />
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-white font-bold text-lg leading-tight uppercase tracking-tight">E-Scooty</span>
+                            <span className="text-white font-bold text-lg leading-tight uppercase tracking-tight">E-Vehicle</span>
                             <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">monitoring</span>
                         </div>
                     </div>
@@ -116,20 +116,39 @@ const Layout = () => {
                     <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em] px-8 mb-4">Main Menu</p>
                     <div className="space-y-1">
                         {navLinks.map((link) => {
-                            const isActive = location.pathname === link.path;
+                            // Monitor is "active" when on / (dashboard grid) OR /monitor (telemetry view)
+                            const isActive = link.label === 'Monitor'
+                                ? (location.pathname === '/' || location.pathname === '/monitor')
+                                : location.pathname === link.path;
+
+                             const handleNavClick = () => {
+                                 setSidebarOpen(false);
+                                 if (link.label === 'Monitor') {
+                                     if (location.pathname === '/monitor') {
+                                         navigate('/');
+                                     } else if (location.pathname === '/') {
+                                         // Do nothing ("click not working")
+                                     } else {
+                                         // If on any other secondary page, bring back to dashboards grid
+                                         navigate('/');
+                                     }
+                                 } else {
+                                     navigate(link.path);
+                                 }
+                             };
+
                             return (
-                                <Link
+                                <button
                                     key={link.path}
-                                    to={link.path}
-                                    onClick={() => setSidebarOpen(false)}
-                                    className={`sidebar-item ${isActive ? 'active' : ''} ${link.label === 'Monitor' && isAlertActive ? 'animate-pulse text-red-500 bg-red-500/10 font-black' : ''}`}
+                                    onClick={handleNavClick}
+                                    className={`sidebar-item w-full text-left ${isActive ? 'active' : ''} ${link.label === 'Monitor' && isAlertActive ? 'animate-pulse text-red-500 bg-red-500/10 font-black' : ''}`}
                                 >
                                     <span className={link.label === 'Monitor' && isAlertActive ? 'text-red-500' : ''}>{link.icon}</span>
                                     {link.label}
                                     {link.label === 'Monitor' && isAlertActive && (
                                         <div className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
                                     )}
-                                </Link>
+                                </button>
                             );
                         })}
                     </div>
@@ -159,7 +178,7 @@ const Layout = () => {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 {/* Header */}
-                <header className="h-20 bg-white shrink-0 flex items-center px-6 lg:px-10 border-bottom border-[#E5E7EB] z-30">
+                <header className="h-20 bg-white shrink-0 flex items-center px-6 lg:px-10 border-b border-[#E5E7EB] z-30">
                     <button className="lg:hidden text-slate-500 mr-4" onClick={() => setSidebarOpen(true)}>
                         <Menu size={24} />
                     </button>

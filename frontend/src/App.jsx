@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
+import Monitor from './pages/Monitor'
 import DeviceList from './pages/DeviceList'
 import CreateDashboard from './pages/CreateDashboard'
 import AdminPanel from './pages/AdminPanel'
@@ -38,6 +39,7 @@ function App() {
         {/* Protected Routes */}
         <Route path="/" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
+          <Route path="monitor" element={<Monitor />} />
           {/* Admin + Operator Routes (read-only access) */}
           <Route path="devices" element={<OperatorRoute><DeviceList /></OperatorRoute>} />
           <Route path="logs" element={<OperatorRoute><DataLogs /></OperatorRoute>} />

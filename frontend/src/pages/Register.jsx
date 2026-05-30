@@ -211,7 +211,7 @@ const Register = () => {
                 <div className="auth-hero-side hidden lg:flex">
                     <img 
                         src="/scooty.png" 
-                        alt="E-Scooty Asset" 
+                        alt="E-Vehicle Asset" 
                         className="scooty-static"
                     />
                 </div>

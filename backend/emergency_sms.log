@@ -166,3 +166,13 @@
 {"level":"error","message":"SMS Error [9040682546]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
 {"level":"info","message":"Retrying SMS to 9040682546... (1 left)"}
 {"level":"error","message":"SMS Error [9040682546]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"error","message":"SMS Error [9040682566]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682566... (2 left)"}
+{"level":"error","message":"SMS Error [9040682566]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682566... (1 left)"}
+{"level":"error","message":"SMS Error [9040682566]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"error","message":"SMS Error [9040682566]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682566... (2 left)"}
+{"level":"error","message":"SMS Error [9040682566]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
+{"level":"info","message":"Retrying SMS to 9040682566... (1 left)"}
+{"level":"error","message":"SMS Error [9040682566]: {\"return\":false,\"status_code\":412,\"message\":\"Invalid Authentication, Check Authorization Key\"}"}
