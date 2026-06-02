@@ -58,7 +58,13 @@ exports.receiveData = async (req, res) => {
 
         const normalizedIgnition = String(ignitionStatus || '').trim().toUpperCase();
         let mappedIgnitionStatus = 'OFF';
-        if (normalizedIgnition === '1' || normalizedIgnition === 'ON') mappedIgnitionStatus = 'ON';
+        if (normalizedIgnition === '1' || normalizedIgnition === 'ON') {
+            mappedIgnitionStatus = 'ON';
+        } else if (normalizedIgnition === 'NC') {
+            // NC = No Change — preserve the most recent stored ignition status
+            const lastRecord = await DeviceData.findOne({ deviceId }).sort({ timestamp: -1 }).select('ignitionStatus');
+            mappedIgnitionStatus = (lastRecord && lastRecord.ignitionStatus) ? lastRecord.ignitionStatus : 'OFF';
+        }
 
         const newData = new DeviceData({
             deviceId,
@@ -361,7 +367,16 @@ exports.syncCoreData = async (req, res) => {
         const warningLevel = getWarningLevel(batteryTemp);
 
         const normalizedIgnition = String(ignitionStatus || '').trim().toUpperCase();
-        const mappedIgnitionStatus = (normalizedIgnition === 'ON' || normalizedIgnition === '1') ? 'ON' : 'OFF';
+        let mappedIgnitionStatus;
+        if (normalizedIgnition === 'ON' || normalizedIgnition === '1') {
+            mappedIgnitionStatus = 'ON';
+        } else if (normalizedIgnition === 'NC') {
+            // NC = No Change — preserve the most recent stored ignition status
+            const lastRecord = await DeviceData.findOne({ deviceId }).sort({ timestamp: -1 }).select('ignitionStatus');
+            mappedIgnitionStatus = (lastRecord && lastRecord.ignitionStatus) ? lastRecord.ignitionStatus : 'OFF';
+        } else {
+            mappedIgnitionStatus = 'OFF';
+        }
 
         const newData = new DeviceData({
             deviceId,
@@ -373,7 +388,9 @@ exports.syncCoreData = async (req, res) => {
             warningLevel:       isEnabled('batteryTemperature') ? warningLevel : undefined,
             motorTemperature:   isEnabled('motorTemperature') && motorTemperature !== undefined ? Number(motorTemperature) : undefined,
             motorRPM:           isEnabled('motorRPM') && motorRPM !== undefined ? Number(motorRPM) : undefined,
-            speed:              isEnabled('speed') && (speed !== undefined || Speed !== undefined) ? Number(speed || Speed) : undefined,
+            speed:              isEnabled('speed') && (speed !== undefined || Speed !== undefined)
+                                    ? (speed !== undefined ? Number(speed) : Number(Speed))
+                                    : undefined,
             brakeStatus:        mappedBrakeStatus,
             emergencyBrakeTimestamp,
             gpsLatitude:        isEnabled('gps') && (latitude !== undefined || gpsLatitude !== undefined) ? Number(latitude || gpsLatitude) : undefined,

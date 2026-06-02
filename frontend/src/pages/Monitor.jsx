@@ -263,7 +263,7 @@ const Monitor = () => {
         },
         {
             icon: <Activity size={24} />,
-            label: 'Current Speed', value: hasSpeed ? Number(latestData.speed).toFixed(1) : '---', unit: 'km/h',
+            label: 'Current Speed', value: hasSpeed ? (Number(latestData.speed) % 1 === 0 ? String(Number(latestData.speed)) : Number(latestData.speed).toFixed(1)) : '---', unit: 'km/h',
             grad: hasSpeed ? 'grad-emerald' : 'grad-dark border border-white/5',
             sub: hasSpeed ? 'Real-time velocity' : '---',
         },
