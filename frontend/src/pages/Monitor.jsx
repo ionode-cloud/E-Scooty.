@@ -675,10 +675,14 @@ const Monitor = () => {
                 {(() => {
                     const features = selectedDashboard?.enabledFeatures || [];
                     const showGPS = features.includes('gps');
+                    const showEmergencyHistory = features.includes('emergencyHistory');
+
+                    if (!showGPS && !showEmergencyHistory) return null;
+
                     return (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" style={{ maxHeight: "500px" }}>
                             {showGPS && (
-                                <div className="lg:col-span-2 premium-kpi grad-dark p-8 flex flex-col" style={{ minHeight: '420px' }}>
+                                <div className={`premium-kpi grad-dark p-8 flex flex-col ${showEmergencyHistory ? 'lg:col-span-2' : 'lg:col-span-3'}`} style={{ minHeight: '420px' }}>
                                     <div className="sparkline-bg opacity-10" />
                                     <div className="flex justify-between items-center mb-4 relative z-10 text-white">
                                         <div className="flex items-center gap-3">
@@ -729,79 +733,81 @@ const Monitor = () => {
                             )}
 
                             {/* Emergency Alert History */}
-                            <div className={`premium-kpi grad-dark p-6 flex flex-col ${showGPS ? 'lg:col-span-1' : 'lg:col-span-3'}`} style={{ height: '500px' }}>
-                                <div className="flex items-center justify-between mb-5 relative z-10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-[#FF4D4D] border border-white/10">
-                                            <BellRing size={20} />
+                            {showEmergencyHistory && (
+                                <div className={`premium-kpi grad-dark p-6 flex flex-col ${showGPS ? 'lg:col-span-1' : 'lg:col-span-3'}`} style={{ height: '500px' }}>
+                                    <div className="flex items-center justify-between mb-5 relative z-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-[#FF4D4D] border border-white/10">
+                                                <BellRing size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-base font-black tracking-tight text-[#FF4D4D]">Emergency History</h3>
+                                                <p className="text-[10px] font-black text-[#FF4D4D]/60 uppercase tracking-[0.2em] mt-0.5">Critical Incident Log</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 className="text-base font-black tracking-tight text-[#FF4D4D]">Emergency History</h3>
-                                            <p className="text-[10px] font-black text-[#FF4D4D]/60 uppercase tracking-[0.2em] mt-0.5">Critical Incident Log</p>
-                                        </div>
+                                        <button
+                                            onClick={handleClearAlertHistory}
+                                            className="p-2.5 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-rose-400 hover:bg-rose-400/10 transition-all group"
+                                            title="Clear Alert History"
+                                        >
+                                            <Trash2 size={16} className="group-hover:rotate-12 transition-transform" />
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={handleClearAlertHistory}
-                                        className="p-2.5 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-rose-400 hover:bg-rose-400/10 transition-all group"
-                                        title="Clear Alert History"
-                                    >
-                                        <Trash2 size={16} className="group-hover:rotate-12 transition-transform" />
-                                    </button>
-                                </div>
-                                <div className="flex-1 overflow-hidden relative z-10">
-                                    {alertHistory.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-full text-white/20 gap-2">
-                                            <ShieldCheck size={32} />
-                                            <p className="text-[11px] font-black uppercase tracking-widest">No Critical Alerts</p>
-                                        </div>
-                                    ) : (
-                                        <div className="overflow-y-auto h-full custom-scrollbar">
-                                            <table className="w-full text-left border-separate border-spacing-y-2">
-                                                <thead>
-                                                    <tr>
-                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2">Timestamp</th>
-                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2">Incident</th>
-                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-center">SOC/SOH</th>
-                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-center">Spd/Vlt</th>
-                                                        <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-right">SMS</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {alertHistory.map(alert => (
-                                                        <tr key={alert._id} className="group">
-                                                            <td className="bg-white/5 border-l border-y border-white/10 rounded-l-xl px-2 py-3 text-[9px] font-mono font-bold text-white/80 group-hover:bg-white/10 transition-colors">
-                                                                {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </td>
-                                                            <td className="bg-white/5 border-y border-white/10 px-2 py-3 group-hover:bg-white/10 transition-colors">
-                                                                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-[#FF4D4D]/10 text-[#FF4D4D] border border-[#FF4D4D]/20 block w-fit">
-                                                                    {alert.action === 'EMERGENCY_TRIGGER' ? 'MANUAL' : alert.action.split(' ')[0]}
-                                                                </span>
-                                                            </td>
-                                                            <td className="bg-white/5 border-y border-white/10 px-2 py-3 text-center group-hover:bg-white/10 transition-colors">
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className="text-[10px] font-black text-white">{alert.batterySOC ?? 0}%</span>
-                                                                    <span className="text-[7px] font-bold text-white/40 uppercase">H:{alert.batterySOH ?? 100}%</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="bg-white/5 border-y border-white/10 px-2 py-3 text-center group-hover:bg-white/10 transition-colors">
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className="text-[10px] font-black text-white">{alert.speed ?? 0}</span>
-                                                                    <span className="text-[7px] font-bold text-white/40 uppercase">{alert.batteryVoltage ?? 0}V</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="bg-white/5 border-r border-y border-white/10 rounded-r-xl px-2 py-3 text-[9px] font-black text-right group-hover:bg-white/10 transition-colors">
-                                                                <span className={alert.smsStatus === 'Sent' ? 'text-emerald-400' : 'text-rose-400'}>
-                                                                    {alert.smsStatus === 'Sent' ? 'SENT' : 'FAIL'}
-                                                                </span>
-                                                            </td>
+                                    <div className="flex-1 overflow-hidden relative z-10">
+                                        {alertHistory.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-full text-white/20 gap-2">
+                                                <ShieldCheck size={32} />
+                                                <p className="text-[11px] font-black uppercase tracking-widest">No Critical Alerts</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-y-auto h-full custom-scrollbar">
+                                                <table className="w-full text-left border-separate border-spacing-y-2">
+                                                    <thead>
+                                                        <tr>
+                                                            <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2">Timestamp</th>
+                                                            <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2">Incident</th>
+                                                            <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-center">SOC/SOH</th>
+                                                            <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-center">Spd/Vlt</th>
+                                                            <th className="text-[8px] font-black uppercase tracking-widest text-white/30 px-2 pb-2 text-right">SMS</th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                                                    </thead>
+                                                    <tbody>
+                                                        {alertHistory.map(alert => (
+                                                            <tr key={alert._id} className="group">
+                                                                <td className="bg-white/5 border-l border-y border-white/10 rounded-l-xl px-2 py-3 text-[9px] font-mono font-bold text-white/80 group-hover:bg-white/10 transition-colors">
+                                                                    {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </td>
+                                                                <td className="bg-white/5 border-y border-white/10 px-2 py-3 group-hover:bg-white/10 transition-colors">
+                                                                    <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md bg-[#FF4D4D]/10 text-[#FF4D4D] border border-[#FF4D4D]/20 block w-fit">
+                                                                        {alert.action === 'EMERGENCY_TRIGGER' ? 'MANUAL' : alert.action.split(' ')[0]}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="bg-white/5 border-y border-white/10 px-2 py-3 text-center group-hover:bg-white/10 transition-colors">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className="text-[10px] font-black text-white">{alert.batterySOC ?? 0}%</span>
+                                                                        <span className="text-[7px] font-bold text-white/40 uppercase">H:{alert.batterySOH ?? 100}%</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="bg-white/5 border-y border-white/10 px-2 py-3 text-center group-hover:bg-white/10 transition-colors">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className="text-[10px] font-black text-white">{alert.speed ?? 0}</span>
+                                                                        <span className="text-[7px] font-bold text-white/40 uppercase">{alert.batteryVoltage ?? 0}V</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="bg-white/5 border-r border-y border-white/10 rounded-r-xl px-2 py-3 text-[9px] font-black text-right group-hover:bg-white/10 transition-colors">
+                                                                    <span className={alert.smsStatus === 'Sent' ? 'text-emerald-400' : 'text-rose-400'}>
+                                                                        {alert.smsStatus === 'Sent' ? 'SENT' : 'FAIL'}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     );
                 })()}

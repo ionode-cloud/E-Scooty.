@@ -12,7 +12,8 @@ const dashboardSchema = new mongoose.Schema({
             'motorTemperature', 'motorRPM', 'wheelRPM',
             'loss', 'torque', 'gps',
             'ignitionSwitch',
-            'batterySOH', 'speed', 'systemStatus'
+            'batterySOH', 'speed', 'systemStatus',
+            'emergencyHistory'
         ],
         default: [],
     },

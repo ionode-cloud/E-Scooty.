@@ -34,6 +34,7 @@ const CreateDashboard = () => {
         { key: 'motorTemperature',   label: 'Motor Temperature', icon: <Thermometer size={16} /> },
         { key: 'ignitionSwitch',     label: 'Ignition Switch',   icon: <Power size={16} /> },
         { key: 'systemStatus',       label: 'System Status',     icon: <ShieldAlert size={16} /> },
+        { key: 'emergencyHistory',   label: 'Emergency History', icon: <BellRing size={16} /> },
     ];
 
     const toggleWidget = (key) => {

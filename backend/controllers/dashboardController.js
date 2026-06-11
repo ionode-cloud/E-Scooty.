@@ -68,7 +68,7 @@ exports.createDashboard = async (req, res) => {
             dashboardName,
             particleId,
             deviceId,
-            enabledFeatures: enabledFeatures || ['batterySOC', 'batteryVoltage', 'batteryTemperature', 'motorTemperature', 'motorRPM', 'wheelRPM', 'loss', 'torque', 'gps'],
+            enabledFeatures: enabledFeatures || ['batterySOC', 'batteryVoltage', 'batteryTemperature', 'motorTemperature', 'motorRPM', 'wheelRPM', 'loss', 'torque', 'gps', 'emergencyHistory'],
             description: description || '',
             emergencyContacts: emergencyContacts || [],
             user: user._id
