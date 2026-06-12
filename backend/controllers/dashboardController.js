@@ -126,6 +126,29 @@ exports.getDashboards = async (req, res) => {
     }
 };
 
+exports.updateDashboardWidgets = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { enabledFeatures } = req.body;
+
+        if (!Array.isArray(enabledFeatures)) {
+            return res.status(400).json({ message: 'enabledFeatures must be an array.' });
+        }
+
+        const dashboard = await Dashboard.findByIdAndUpdate(
+            id,
+            { enabledFeatures },
+            { new: true }
+        ).populate('user', 'email');
+
+        if (!dashboard) return res.status(404).json({ message: 'Dashboard not found.' });
+
+        res.status(200).json({ message: 'Widgets updated successfully.', dashboard });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 exports.deleteDashboard = async (req, res) => {
     try {
         const { id } = req.params;

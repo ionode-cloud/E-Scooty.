@@ -11,7 +11,8 @@ import {
     Zap, MapPin, AlertTriangle, Shield,
     ChevronRight, Trash2, Activity,
     BellRing, Clock, Bike, FileText,
-    Thermometer, Siren, ShieldCheck, Gauge, Power, LayoutGrid
+    Thermometer, Siren, ShieldCheck, Gauge, Power, LayoutGrid,
+    Pencil, X, Settings2, ShieldAlert, Check
 } from 'lucide-react';
 import '../index.css';
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -42,10 +43,61 @@ const Monitor = () => {
     const [activeEmergencyDeviceIds, setActiveEmergencyDeviceIds] = useState([]);
     const [emergencyCountdown, setEmergencyCountdown] = useState(0);
     const [ignitionLoading, setIgnitionLoading] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editWidgets, setEditWidgets] = useState([]);
+    const [editLoading, setEditLoading] = useState(false);
+    const [editError, setEditError] = useState('');
     const sirenActive = activeEmergencyDeviceIds.length > 0;
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
     const navigate = useNavigate();
+
+    const WIDGET_OPTIONS = [
+        { key: 'batterySOC',         label: 'Battery SOC',         icon: <Bike size={16} /> },
+        { key: 'batterySOH',         label: 'Battery SOH',         icon: <Shield size={16} /> },
+        { key: 'batteryVoltage',     label: 'Battery Voltage',     icon: <Zap size={16} /> },
+        { key: 'batteryTemperature', label: 'Battery Temp',        icon: <Thermometer size={16} /> },
+        { key: 'speed',              label: 'Current Speed',       icon: <Activity size={16} /> },
+        { key: 'gps',                label: 'GPS Map',             icon: <MapPin size={16} /> },
+        { key: 'motorRPM',           label: 'Motor RPM',           icon: <Gauge size={16} /> },
+        { key: 'motorTemperature',   label: 'Motor Temperature',   icon: <Thermometer size={16} /> },
+        { key: 'ignitionSwitch',     label: 'Ignition Switch',     icon: <Power size={16} /> },
+        { key: 'systemStatus',       label: 'System Status',       icon: <ShieldAlert size={16} /> },
+        { key: 'emergencyHistory',   label: 'Emergency History',   icon: <BellRing size={16} /> },
+    ];
+
+    const openEditModal = () => {
+        setEditWidgets(selectedDashboard?.enabledFeatures ? [...selectedDashboard.enabledFeatures] : []);
+        setEditError('');
+        setShowEditModal(true);
+    };
+
+    const toggleEditWidget = (key) => {
+        setEditWidgets(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    };
+
+    const handleSaveWidgets = async () => {
+        if (!selectedDashboard) return;
+        setEditLoading(true);
+        setEditError('');
+        try {
+            const apiUrl = import.meta.env.VITE_API_URL;
+            const token = localStorage.getItem('token');
+            const res = await axios.patch(
+                `${apiUrl}/api/dashboards/${selectedDashboard._id}/widgets`,
+                { enabledFeatures: editWidgets },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            // Update local selectedDashboard state with new features
+            setSelectedDashboard(prev => ({ ...prev, enabledFeatures: editWidgets }));
+            setDashboards(prev => prev.map(d => d._id === selectedDashboard._id ? { ...d, enabledFeatures: editWidgets } : d));
+            setShowEditModal(false);
+        } catch (err) {
+            setEditError(err.response?.data?.message || 'Failed to update widgets.');
+        } finally {
+            setEditLoading(false);
+        }
+    };
 
     const handleIgnitionToggle = async () => {
         if (!selectedDashboard || ignitionLoading) return;
@@ -348,40 +400,53 @@ const Monitor = () => {
                 )}
 
                 {/* Header Row */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#064E3B] shadow-lg shadow-black/20">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    {/* Left: Icon + Title + Meta */}
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#064E3B] shadow-lg shadow-black/20 shrink-0">
                             <Bike size={28} className="text-white" />
                         </div>
-                        <div>
-                            <h1 className="text-3xl font-black text-[#064E3B] tracking-tight">E-Vehicle Monitor</h1>
-                            <div className="flex items-center gap-2 mt-1">
-                                <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em]">Real-time Telemetry Terminal</p>
-                                <div className="w-1 h-1 rounded-full bg-[#10B981]"></div>
-                                <p className="text-[10px] font-bold text-[#10B981] lowercase">By: {selectedDashboard?.user?.email || 'N/A'}</p>
+                        <div className="flex flex-col gap-1">
+                            <h1 className="text-3xl font-black text-[#064E3B] tracking-tight leading-none">E-Vehicle Monitor</h1>
+                            <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em]">Real-time Telemetry Terminal</p>
+                            <div className="flex items-center flex-wrap gap-2 mt-0.5">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></div>
+                                    <p className="text-[10px] font-bold text-[#10B981]">{selectedDashboard?.user?.email || 'N/A'}</p>
+                                </div>
                                 {selectedDashboard?.emergencyContacts?.length > 0 && (
-                                    <>
-                                        <div className="w-1 h-1 rounded-full bg-[#CBD5E1]"></div>
-                                        <div className="flex items-center gap-1.5 bg-[#F1F5F9] px-2 py-0.5 rounded-md border border-[#E2E8F0]">
-                                            <span className="text-[9px] font-black text-[#64748B] uppercase tracking-wider">SMS Alert To:</span>
-                                            <span className="text-[9px] font-bold text-[#064E3B]">{selectedDashboard.emergencyContacts.join(', ')}</span>
-                                        </div>
-                                    </>
+                                    <div className="flex items-center gap-1.5 bg-[#F1F5F9] px-2 py-0.5 rounded-md border border-[#E2E8F0]">
+                                        <span className="text-[9px] font-black text-[#64748B] uppercase tracking-wider">SMS Alert To:</span>
+                                        <span className="text-[9px] font-bold text-[#064E3B]">{selectedDashboard.emergencyContacts.join(', ')}</span>
+                                    </div>
                                 )}
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+
+                    {/* Right: Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Edit Widgets — Root Admin only */}
+                        {isAdmin && (
+                            <button
+                                onClick={openEditModal}
+                                id="edit-widgets-btn"
+                                className="flex items-center gap-2 h-10 px-4 bg-[#064E3B] text-white rounded-xl text-sm font-bold hover:bg-[#065f46] transition-all shadow-sm"
+                            >
+                                <Pencil size={14} />
+                                Edit
+                            </button>
+                        )}
                         {/* Back to Dashboard Grid button */}
                         <button
                             onClick={() => navigate('/')}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E5E7EB] rounded-2xl text-sm font-bold text-[#064E3B] hover:border-[#10B981] hover:text-[#10B981] transition-all shadow-sm"
+                            className="flex items-center gap-2 h-10 px-4 bg-white border border-[#E5E7EB] rounded-xl text-sm font-bold text-[#064E3B] hover:border-[#10B981] hover:text-[#10B981] transition-all shadow-sm whitespace-nowrap"
                         >
-                            <LayoutGrid size={16} />
+                            <LayoutGrid size={15} />
                             All Dashboards
                         </button>
                         <select
-                            className="bg-white border border-[#E5E7EB] rounded-2xl px-5 py-3 text-sm font-bold text-[#064E3B] outline-none shadow-sm min-w-[200px]"
+                            className="h-10 bg-white border border-[#E5E7EB] rounded-xl px-4 text-sm font-bold text-[#064E3B] outline-none shadow-sm min-w-[170px] cursor-pointer"
                             value={selectedDashboard?._id || ''}
                             onChange={e => {
                                 const found = dashboards.find(d => d._id === e.target.value);
@@ -396,6 +461,7 @@ const Monitor = () => {
                         </select>
                     </div>
                 </div>
+
 
                 {/* KPI Cards */}
                 {(() => {
@@ -812,6 +878,139 @@ const Monitor = () => {
                     );
                 })()}
             </>
+
+            {/* ======= Edit Widgets Modal (Root Admin Only) ======= */}
+            {showEditModal && isAdmin && (
+                <div
+                    id="edit-widgets-modal"
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+                    style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false); }}
+                >
+                    <div
+                        className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                        style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-8 pt-8 pb-6 border-b border-[#F1F5F9]">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-[#064E3B] flex items-center justify-center">
+                                    <Settings2 size={18} className="text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-black text-[#064E3B] tracking-tight">Edit Widget Selection</h2>
+                                    <p className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-[0.2em] mt-0.5">
+                                        {selectedDashboard?.dashboardName}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowEditModal(false)}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center text-[#94A3B8] hover:bg-[#F1F5F9] hover:text-[#064E3B] transition-all"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="flex items-center justify-end gap-4 px-8 py-3 bg-[#F8FAFC] border-b border-[#F1F5F9]">
+                            <button
+                                type="button"
+                                onClick={() => setEditWidgets(WIDGET_OPTIONS.map(w => w.key))}
+                                className="text-[10px] font-black text-[#10B981] uppercase tracking-widest hover:opacity-70 transition-opacity"
+                            >
+                                Select All
+                            </button>
+                            <span className="text-[#CBD5E1] text-xs">|</span>
+                            <button
+                                type="button"
+                                onClick={() => setEditWidgets([])}
+                                className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest hover:opacity-70 transition-opacity"
+                            >
+                                Clear All
+                            </button>
+                        </div>
+
+                        {/* Widget Grid */}
+                        <div className="overflow-y-auto px-8 py-6 flex-1">
+                            <div className="grid grid-cols-2 gap-3">
+                                {WIDGET_OPTIONS.map(widget => {
+                                    const isOn = editWidgets.includes(widget.key);
+                                    return (
+                                        <button
+                                            key={widget.key}
+                                            type="button"
+                                            onClick={() => toggleEditWidget(widget.key)}
+                                            className={`relative flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer
+                                                ${isOn
+                                                    ? 'bg-[#064E3B] border-[#10B981] shadow-lg shadow-emerald-500/15'
+                                                    : 'bg-white border-[#E5E7EB] hover:border-[#10B981] hover:shadow-md'
+                                                }
+                                            `}
+                                        >
+                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0
+                                                ${isOn ? 'bg-white/15 text-white' : 'bg-[#F8FAFC] text-[#94A3B8]'}
+                                            `}>
+                                                {widget.icon}
+                                            </div>
+                                            <span className={`text-[11px] font-black uppercase tracking-wide leading-tight flex-1
+                                                ${isOn ? 'text-white' : 'text-[#374151]'}
+                                            `}>
+                                                {widget.label}
+                                            </span>
+                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all
+                                                ${isOn ? 'bg-[#10B981] border-[#10B981]' : 'border-[#D1D5DB] bg-white'}
+                                            `}>
+                                                {isOn && <Check size={11} className="text-white" strokeWidth={3} />}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Summary */}
+                            <div className="flex items-start gap-2 p-3 bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl mt-4">
+                                <Settings2 size={14} className="text-[#10B981] mt-0.5 shrink-0" />
+                                <p className="text-[10px] text-[#6B7280] font-medium leading-relaxed">
+                                    {editWidgets.length === 0
+                                        ? <span className="font-black text-[#94A3B8]">No widgets selected — dashboard will have no cards.</span>
+                                        : <><span className="font-black text-[#064E3B]">{editWidgets.length}</span> widget{editWidgets.length > 1 ? 's' : ''} selected: <span className="font-black text-[#064E3B]">{editWidgets.join(', ')}</span></>
+                                    }
+                                </p>
+                            </div>
+
+                            {/* Error */}
+                            {editError && (
+                                <div className="mt-3 p-3 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-bold">
+                                    {editError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-3 px-8 py-6 border-t border-[#F1F5F9]">
+                            <button
+                                onClick={() => setShowEditModal(false)}
+                                className="px-6 py-2.5 rounded-2xl border border-[#E5E7EB] text-sm font-bold text-[#64748B] hover:bg-[#F1F5F9] transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveWidgets}
+                                disabled={editLoading}
+                                className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-[#064E3B] text-white text-sm font-black hover:bg-[#065f46] transition-all shadow-sm disabled:opacity-60"
+                            >
+                                {editLoading ? (
+                                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <Check size={15} />
+                                )}
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
