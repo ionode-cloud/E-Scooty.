@@ -29,8 +29,16 @@ const AdminPanel = () => {
         e.preventDefault();
         try {
             const apiUrl = import.meta.env.VITE_API_URL;
+            const token = localStorage.getItem('token');
             if (editingUser) {
                 if (newUser.password && newUser.password.length < 6) return alert('New password must be at least 6 characters.');
+                const payload = {
+                    email: newUser.email,
+                    role: newUser.role
+                };
+                if (newUser.password) {
+                    payload.password = newUser.password;
+                }
                 await axios.put(`${apiUrl}/api/users/${editingUser._id}`, payload, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
